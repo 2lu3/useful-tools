@@ -3,6 +3,10 @@ import subprocess
 import os, tkinter, tkinter.filedialog
 import ffmpeg
 
+class Test():
+  def __init__(self)
+  
+  pass
 
 def get_file_path():
   root = tkinter.Tk()
