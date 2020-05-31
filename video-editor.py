@@ -117,12 +117,12 @@ class VideoEditor:
 
 
 commands = [
-    "trim name start end (save_name)",
-    "rename old_name new_name",
-    "concat name1, name2 (save_name)",
-    "del name",
+    "trim",
+    "rename",
+    "concat",
+    "del",
     "show",
-    "play name",
+    "play",
     "exit",
 ]
 
@@ -143,41 +143,47 @@ def show_all_videos():
 
 
 def input_order():
-    for i, command in enumerate(commands):
-        print(i, command)
+    def input_command():
+        for i, command in enumerate(commands):
+            print(i, command)
+        order = input("コマンドを入力して下さい\n")
+        if order.isdecimal(): # 数字で入力された場合
+            order = commands[int(order)]
+        return order
 
-    order = input("コマンドを入力して下さい(数字で)\n")
+    def choose_target_video():
+        print("動画を選んで下さい(数字で)")
+        return input()
 
-    if order == "6" or order == "exit":  # exit
-        return "exit", None
+    def enter_new_name():
+        print("新しい名前を入力して下さい")
+        name = input()
+        if name == "":
+            name = None
+        return name
+
+    order = input_command()
+
+    if order == "exit":  # exit
+        exit()
 
     show_all_videos()
     if order == "4" or order == "show":
         return None, None
 
-    print("動画を選んで下さい(数字で)")
-    index = input()
+    index = choose_target_video()
     if order == "0":  # trim
         print("開始位置を入力してください")
         start = int(input())
         print("終了位置を入力して下さい")
         end = int(input())
-        print("新しい名前を入力して下さい")
-        name = input()
-        if name == "":
-            name = None
+        name = enter_new_name()
         return "trim", [int(index), start, end, name]
     elif order == "1":  # rename
-        print("新しい名前を入力して下さい")
-        name = input()
-        if name == "":
-            name = None
+        name = enter_new_name()
         return "rename", [int(index), name]
     elif order == "2":  # concat
-        print("新しい名前を入力して下さい")
-        name = input()
-        if name == "":
-            name = None
+        name = enter_new_name()
         index = index.split(" ")
         return "concat", [index, name]
     elif order == "3":  # del
