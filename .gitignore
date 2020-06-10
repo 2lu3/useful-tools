@@ -1,2 +1,4 @@
-__pychache__
-output/*
+__pycache__
+**/output/*
+**/.vscode/
+**/__pycache__/

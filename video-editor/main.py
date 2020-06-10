@@ -17,7 +17,7 @@ from subprocess import PIPE, Popen
 
 from controller import Controller
 from video import Video
-from view import View
+from view import MainView
 
 
 class VideoEditor:
@@ -196,9 +196,9 @@ def main():
     app = tk.Tk()
     app.title("video-editor")
 
-    video = Video("main")
-    view = View(app, video)
-    controller = Controller(app, video, view)
+    main_video = Video("main")
+    view = MainView(app, main_video)
+    controller = Controller(app, main_video, view)
 
     app.mainloop()
 

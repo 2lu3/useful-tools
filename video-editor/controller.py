@@ -1,3 +1,6 @@
+from video import Video
+
+
 class Controller:
     def __init__(self, app, video, view):
         self.master = app
@@ -64,15 +67,14 @@ class Controller:
         '動画選択ボタンが押された時の処理'
 
         file_types = [
-            ("MOVファイル", "*.mov"),
             ("MP4ファイル", "*.mp4"),
+            ("MOVファイル", "*.mov"),
         ]
 
         # ファイル選択画面表示
         file_path = self.view.select_open_file(file_types)
 
         if len(file_path) != 0:
-
             # 動画オブジェクト生成
             self.video.load_video(file_path)
 
@@ -112,6 +114,6 @@ class Controller:
             self.view.delete_play_button()
         else:
             self.playing = False
-            
+
             # 再生ボタンの描画
             self.view.draw_play_button()

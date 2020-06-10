@@ -5,12 +5,12 @@ from PIL import Image, ImageTk
 
 
 class Video:
-    def __init__(self, name, path="output/", ext=".mp4"):
+    def __init__(self, name, path=None):
         # 動画名称
         self.name = name
 
         # 動画path
-        self.path = path + name + ext
+        self.path = path
 
         # 動画オブジェクト
         self.video = None
@@ -65,4 +65,3 @@ class Video:
 
     def remove(self):
         os.remove(self.path)
-

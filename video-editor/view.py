@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import filedialog
 
 
-class View:
+class MainView:
     def __init__(self, app, video):
         self.master = app
         self.video = video
@@ -27,6 +27,10 @@ class View:
         self.operation_frame = tk.Frame(self.main_frame)
         self.operation_frame.grid(column=2, row=1)
 
+        # 動画選択用フレームの作成と配置
+        self.video_select_frame = tk.Frame(self.main_frame)
+        self.video_select_frame.grid(column=1, row=2)
+
         # キャンバスの作成と配置
         self.canvas = tk.Canvas(
             self.canvas_frame, width=canvas_width, height=canvas_height, bg="#EEEEEE",
@@ -36,6 +40,9 @@ class View:
         # ファイル読み込みボタンの作成と配置
         self.load_button = tk.Button(self.operation_frame, text="動画選択")
         self.load_button.pack()
+
+    def set_video(self, video):
+        self.video = video
 
     def draw_image(self):
         # 画像をキャンパスに描画
@@ -51,10 +58,12 @@ class View:
             self.canvas.delete(obj)
 
         # 画像をキャンバスの中央に描画
-        self.canvas.create_image(sx, sy, image=image, anchor=tk.NW, tag="image")
+        self.canvas.create_image(
+            sx, sy, image=image, anchor=tk.NW, tag="image")
 
     def select_open_file(self, file_types):
-        file_path = filedialog.askopenfilename(initialdir=".", filetypes=file_types,)
+        file_path = filedialog.askopenfilename(
+            initialdir=".", filetypes=file_types,)
         return file_path
 
     def draw_play_button(self):
@@ -112,4 +121,3 @@ class View:
     def delete_play_button(self):
         self.canvas.delete("oval")
         self.canvas.delete("triangle")
-
