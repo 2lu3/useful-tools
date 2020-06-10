@@ -11,27 +11,19 @@
 # play a : aを再生
 
 import os
+import tkinter as tk
 from glob import glob
 from subprocess import PIPE, Popen
 
-
-class Video:
-    def __init__(self, name, output_path="output/"):
-        self.output_root = output_path
-        self.rename(name)
-
-    def rename(self, new_name):
-        self.name = new_name
-        self.filename = self.name + ".mp4"
-        self.path = self.output_root + self.filename
-
-    def remove(self):
-        os.remove(self.path)
+from controller import Controller
+from video import Video
+from view import View
 
 
 class VideoEditor:
     def __init__(self):
         self.video_list = []
+        self.selected_video = None
 
     def to_filename(self, name):
         if "." not in name:
@@ -107,22 +99,81 @@ class VideoEditor:
         print(result[1])
 
     # 動画を列挙
-    def show(self):
-        return [video.name for video in self.video_list]
+    def show_all_videos(self):
+        video_list = [video.name for video in self.video_list]
+        print("")
+        print("動画一覧")
+        for i, name in enumerate(video_list):
+            print(i, name)
+        print("")
 
     # 削除
     def remove(self, index):
         os.remove(self.video_list[index].path)
         self.video_list.pop(index)
 
+    def input_order(self):
+        def input_command():
+            for i, command in enumerate(commands):
+                print(i, command)
+            order = input("コマンドを入力して下さい\n")
+            if order.isdecimal():  # 数字で入力された場合
+                order = commands[int(order)]
+            return order
+
+        def choose_target_video():
+            print("動画を選んで下さい(数字で)")
+            return input()
+
+        def enter_new_name():
+            print("新しい名前を入力して下さい")
+            name = input()
+            if name == "":
+                name = None
+            return name
+
+        order = input_command()
+
+        if order == "exit":  # exit
+            exit()
+
+        self.show_all_videos()
+        if order == "info":
+            return None, None
+
+        index = choose_target_video()
+        if order == "0":  # trim
+            print("開始位置を入力してください")
+            start = int(input())
+            print("終了位置を入力して下さい")
+            end = int(input())
+            name = enter_new_name()
+            return "trim", [int(index), start, end, name]
+        elif order == "1":  # rename
+            name = enter_new_name()
+            return "rename", [int(index), name]
+        elif order == "2":  # concat
+            name = enter_new_name()
+            index = index.split(" ")
+            return "concat", [index, name]
+        elif order == "3":  # del
+            return "del", [int(index)]
+        elif order == "4":  # show
+            pass
+        elif order == "5":  # play
+            return "play", [int(index)]
+        else:
+            print("this function is coming soon")
+
 
 commands = [
-    "trim",
+    "select" "trim",
     "rename",
     "concat",
     "del",
-    "show",
+    "info",
     "play",
+    "show",
     "exit",
 ]
 
@@ -133,89 +184,23 @@ for path in video_list:
     video_editor.load_video(path)
 
 
-def show_all_videos():
-    video_list = video_editor.show()
-    print("")
-    print("動画一覧")
-    for i, name in enumerate(video_list):
-        print(i, name)
-    print("")
-
-
-def input_order():
-    def input_command():
-        for i, command in enumerate(commands):
-            print(i, command)
-        order = input("コマンドを入力して下さい\n")
-        if order.isdecimal(): # 数字で入力された場合
-            order = commands[int(order)]
-        return order
-
-    def choose_target_video():
-        print("動画を選んで下さい(数字で)")
-        return input()
-
-    def enter_new_name():
-        print("新しい名前を入力して下さい")
-        name = input()
-        if name == "":
-            name = None
-        return name
-
-    order = input_command()
-
-    if order == "exit":  # exit
-        exit()
-
-    show_all_videos()
-    if order == "4" or order == "show":
-        return None, None
-
-    index = choose_target_video()
-    if order == "0":  # trim
-        print("開始位置を入力してください")
-        start = int(input())
-        print("終了位置を入力して下さい")
-        end = int(input())
-        name = enter_new_name()
-        return "trim", [int(index), start, end, name]
-    elif order == "1":  # rename
-        name = enter_new_name()
-        return "rename", [int(index), name]
-    elif order == "2":  # concat
-        name = enter_new_name()
-        index = index.split(" ")
-        return "concat", [index, name]
-    elif order == "3":  # del
-        return "del", [int(index)]
-    elif order == "4":  # show
-        pass
-    elif order == "5":  # play
-        return "play", [int(index)]
+class TkinterUi:
+    def __init__(self):
+        root = tk.Tk()
+        root.title("video-editor")
+        root.geometry()
+        root.mainloop()
 
 
 def main():
-    while True:
-        order, option = input_order()
+    app = tk.Tk()
+    app.title("video-editor")
 
-        if order == "trim":
-            video_editor.trim(option[0], option[1], option[2], option[3])
-        elif order == "rename":
-            video_editor.rename(option[0], option[1])
-        elif order == "concat":
-            video_editor.concat(option[0], option[1])
-        elif order == "del":
-            video_editor.remove(option[0])
-        elif order == "show":
-            show_all_videos()
-        elif order == "play":
-            print("自分でやれ")
-        elif order == "exit":
-            exit()
+    video = Video("main")
+    view = View(app, video)
+    controller = Controller(app, video, view)
 
-        print("")
-        print("")
-        print("")
+    app.mainloop()
 
 
 if __name__ == "__main__":
