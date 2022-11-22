@@ -1,0 +1,31 @@
+[sleep_time]
+time = 0.2
+[add_problem_button]
+# 問題追加ボタン
+x = 2338
+y = 1801
+
+[problem_statement]
+# 問題文入力
+x = 1652
+y = 448
+
+[answer]
+# 回答入力
+x = 1537
+y = 901
+
+[auto_generate_button]
+# 選択肢自動生成
+x = 1692
+y = 1071
+
+[ok_button]
+# OKボタン
+x = 2020
+y = 1395
+
+[save_button]
+# 保存ボタン
+x = 1888
+y = 1460
