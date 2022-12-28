@@ -1,16 +1,16 @@
 [range_selector]
-x = 4441
-y = 2034
+x = 4339
+y = 1935
 
 [export_kind_selector]
-x = 4666
-y = 2311
+x = 4613
+y = 2209
 
 [export_kind]
-x = 4666
-y = 2510
+x = 4639
+y = 2416
 
 [export_button]
-x = 4536
-y = 2425
+x = 4465
+y = 2326
 

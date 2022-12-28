@@ -95,10 +95,10 @@ def main():
 
     wait_to_select_browser()
 
-    print('open new tabs')
-    open_tabs(download_times)
-    print('open tabs again')
-    open_tabs_again(download_times)
+    #print('open new tabs')
+    #open_tabs(download_times)
+    #print('open tabs again')
+    #open_tabs_again(download_times)
 
     print('waiting to load')
     with alive_bar(100) as bar:
