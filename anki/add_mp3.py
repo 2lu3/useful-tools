@@ -16,54 +16,62 @@ class Note:
     sound: str
 
 
-def get_client():
-    client = texttospeech.TextToSpeechClient()
-    return client
+class Anki:
+    def __init__(self):
+        self.media_path = (
+            f"/home/{os.getlogin()}/.local/share/Anki2/ユーザー 1/collection.media"
+        )
+        self.url = "http://localhost:8765"
 
+    def fetch_notes(self, deck_name: str) -> list[Note]:
+        res = requests.post(
+            self.url,
+            json={
+                "action": "findNotes",
+                "version": 6,
+                "params": {"query": f"deck:{deck_name}"},
+            },
+        ).json()
 
-def fetch_notes(deck_name: str) -> list:
-    res = requests.post(
-        "http://localhost:8765",
-        json={
-            "action": "findNotes",
-            "version": 6,
-            "params": {"query": f"deck:{deck_name}"},
-        },
-    ).json()
+        assert res["error"] is None
 
-    assert res["error"] is None
+        indexes = res["result"]
 
-    return res["result"]
+        return [self._fetch_note(index) for index in indexes]
 
+    def update_field(self, note: Note, field: str, value: str):
+        res = requests.post(
+            "http://localhost:8765",
+            json={
+                "action": "updateNoteFields",
+                "version": 6,
+                "params": {"note": {"id": note.index, "fields": {field: value}}},
+            },
+        )
+        assert res.json()["error"] is None
 
-def fetch_note(note_id):
-    res = requests.post(
-        "http://localhost:8765",
-        json={"action": "notesInfo", "version": 6, "params": {"notes": [note_id]}},
-    ).json()
+        return res.json()["result"]
 
-    assert res["error"] is None
+    def add_sound_field(self, note: Note, file_path: str):
+        shutil.move(file_path, os.path.join(self.media_path, f"{note.back}.mp3"))
+        self.update_field(note, "音声", f"[sound:{note.back}.mp3]")
 
-    note_info = res["result"][0]
+    def _fetch_note(self, note_id: int) -> Note:
+        res = requests.post(
+            self.url,
+            json={"action": "notesInfo", "version": 6, "params": {"notes": [note_id]}},
+        ).json()
 
-    return Note(
-        index=note_info["noteId"],
-        front=note_info["fields"]["表面"]["value"],
-        back=note_info["fields"]["裏面"]["value"],
-        sound=note_info["fields"]["音声"]["value"],
-    )
+        assert res["error"] is None
 
+        note_info = res["result"][0]
 
-def update_note_sound(note: Note, sound_path: str):
-    res = requests.post(
-        "http://localhost:8765",
-        json={
-            "action": "updateNoteFields",
-            "version": 6,
-            "params": {"note": {"id": note.index, "fields": {"音声": sound_path}}},
-        },
-    )
-    assert res.json()["error"] is None
+        return Note(
+            index=note_info["noteId"],
+            front=note_info["fields"]["表面"]["value"],
+            back=note_info["fields"]["裏面"]["value"],
+            sound=note_info["fields"]["音声"]["value"],
+        )
 
 
 def generate_sound(client, text: str):
@@ -85,27 +93,22 @@ def generate_sound(client, text: str):
         out.write(res.audio_content)
 
 
-def main(deck_name: str, is_delete: bool):
-    ANKI_MEDIA_PATH = (
-        f"/home/{os.getlogin()}/.local/share/Anki2/ユーザー 1/collection.media"
-    )
-
-    client = get_client()
-
-    note_indexes = fetch_notes(deck_name)
-
-    if is_delete:
-        for index in note_indexes:
-            note = fetch_note(index)
-            if note.sound != "":
-                os.remove(os.path.join(ANKI_MEDIA_PATH, note.sound))
-                update_note_sound(note, "")
-                logger.debug(f"Deleted {note.back}")
-        return
+def delete_mp3(client, deck_name: str):
+    anki = Anki()
+    for note in anki.fetch_notes(deck_name):
+        if note.sound != "":
+            os.remove(os.path.join(ANKI_MEDIA_PATH, note.sound))
+            anki.update_field(note, "音声", "")
+            logger.debug(f"Deleted {note.back}")
+        else:
+            logger.info(
+                f"Skipping {note.front} {note.back} because it doesn't have sound"
+            )
 
 
-    for index in note_indexes:
-        note = fetch_note(index)
+def add_mp3(client, deck_name: str):
+    anki = Anki()
+    for note in anki.fetch_notes(deck_name):
         if note.sound != "":
             logger.info(
                 f"Skipping {note.front} {note.back} because it already has sound"
@@ -116,9 +119,18 @@ def main(deck_name: str, is_delete: bool):
             logger.warning(f"Skipping {note.front} {note.back} because it has no back")
             continue
         generate_sound(client, note.back)
-        shutil.move("output.mp3", os.path.join(ANKI_MEDIA_PATH, f"{note.back}.mp3"))
-        update_note_sound(note, f"[sound:{note.back}.mp3]")
+        anki.add_sound_field(note, "output.mp3")
         logger.debug(f"Updated {note.back}")
+
+
+def main(deck_name: str, is_delete: bool):
+    client = texttospeech.TextToSpeechClient()
+
+    if is_delete:
+        delete_mp3(client, deck_name)
+        return
+    else:
+        add_mp3(client, deck_name)
 
 
 if __name__ == "__main__":
