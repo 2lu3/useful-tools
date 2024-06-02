@@ -56,6 +56,16 @@ class Anki:
         shutil.move(file_path, os.path.join(self.media_path, f"{note.back}.mp3"))
         self.update_field(note, "音声", f"[sound:{note.back}.mp3]")
 
+    def remove_sound_field(self, note: Note):
+        os.remove(os.path.join(self.media_path, note.sound))
+        self.update_field(note, "音声", "")
+
+    def validate_not_nbsp(self, note: Note):
+        if "&nbsp;" in note.front:
+            self.update_field(note, "表面", note.front.replace("&nbsp;", " "))
+        if "&nbsp;" in note.back:
+            self.update_field(note, "裏面", note.back.replace("&nbsp;", " "))
+
     def _fetch_note(self, note_id: int) -> Note:
         res = requests.post(
             self.url,
@@ -72,6 +82,7 @@ class Anki:
             back=note_info["fields"]["裏面"]["value"],
             sound=note_info["fields"]["音声"]["value"],
         )
+
 
 
 def generate_sound(client, text: str):
@@ -93,12 +104,11 @@ def generate_sound(client, text: str):
         out.write(res.audio_content)
 
 
-def delete_mp3(client, deck_name: str):
+def delete_mp3(deck_name: str):
     anki = Anki()
     for note in anki.fetch_notes(deck_name):
         if note.sound != "":
-            os.remove(os.path.join(ANKI_MEDIA_PATH, note.sound))
-            anki.update_field(note, "音声", "")
+            anki.remove_sound_field(note)
             logger.debug(f"Deleted {note.back}")
         else:
             logger.info(
@@ -109,7 +119,7 @@ def delete_mp3(client, deck_name: str):
 def add_mp3(client, deck_name: str):
     anki = Anki()
     for note in anki.fetch_notes(deck_name):
-        if note.sound != "":
+        if note.sound == f"[sound:{note.back}.mp3]":
             logger.info(
                 f"Skipping {note.front} {note.back} because it already has sound"
             )
@@ -122,12 +132,19 @@ def add_mp3(client, deck_name: str):
         anki.add_sound_field(note, "output.mp3")
         logger.debug(f"Updated {note.back}")
 
+def validate_not_nbsp(deck_name: str):
+    anki = Anki()
+    for note in anki.fetch_notes(deck_name):
+        anki.validate_not_nbsp(note)
+
 
 def main(deck_name: str, is_delete: bool):
     client = texttospeech.TextToSpeechClient()
 
+    validate_not_nbsp(deck_name)
+
     if is_delete:
-        delete_mp3(client, deck_name)
+        delete_mp3(deck_name)
         return
     else:
         add_mp3(client, deck_name)
