@@ -148,6 +148,7 @@ def main(deck_name: str, is_delete: bool):
         return
     else:
         add_mp3(client, deck_name)
+        return
 
 
 if __name__ == "__main__":
