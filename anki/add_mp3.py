@@ -6,6 +6,7 @@ from google.cloud import texttospeech
 import shutil
 from loguru import logger
 from argparse import ArgumentParser
+from time import sleep
 
 
 @dataclass
@@ -129,6 +130,7 @@ def add_mp3(client, deck_name: str):
             logger.warning(f"Skipping {note.front} {note.back} because it has no back")
             continue
         generate_sound(client, note.back)
+        sleep(0.1)
         anki.add_sound_field(note, "output.mp3")
         logger.debug(f"Updated {note.back}")
 
