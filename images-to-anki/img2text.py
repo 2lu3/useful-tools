@@ -24,6 +24,7 @@ def send_to_openai(image_path, prompt, api_key):
         response = client.responses.create(
             model="o3",
             reasoning={"effort": "medium"},
+            temperature=0.2,
             input=[
                 {
                     "role": "user",
@@ -80,7 +81,7 @@ def process_images_in_input_directory(prompt, api_key):
         res = send_to_openai(img_path, prompt, api_key)
         return img_path, res
 
-    max_workers = min(10, len(image_files))  # ワーカー数を制限
+    max_workers = min(100, len(image_files))  # ワーカー数を制限
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(worker, img) for img in image_files]
         for future in as_completed(futures):
@@ -113,39 +114,43 @@ def main():
 
 問題について
 
+- 問題番号が与えられている場合は、一番最初に記載して
 - 誤字脱字等があれば適切に修正して
 - 誤字脱字以外は与えられた文章もしくは画像を改変しないで
 
 解答について
 
-- 問題の選択肢の番号(a,b,cや1,2,3)だけを列挙して
-- 番号ごとにその文章が真実の場合は、✅️を最初につけて
-- 番号ごとに背景知識を簡潔に説明して
-- 番号の順番を入れ替えないで
+- 問題が選択肢式の場合
+    - 問題の選択肢の番号(a,b,cや1,2,3など)だけを列挙し、選択肢の内容は解答に含めないで
+    - 選択肢の内容が真実の場合は、✅️を行の最初につけて
+        - 誤っているものを選べという問題なら、誤っていない(=真実)選択肢に✅️をつけて
+    - 選択肢の番号ごとに背景知識を簡潔に1行で説明して
+    - 選択肢の番号の順番を入れ替えないで
+- 問題が記述式の場合
+    - 模範解答を記載して
 
 解説について
 
 - その問題の理解の助けになる解説を体系的に記述して
 - 必要なら「・」を用いた箇条書きや→を使用して
 
-以下に例を示す
+以下に例を示す。ただし、()は説明なので、実際の出力には入れないこと。
 
-1. 正しい選択肢を選べ
+問題10(←問題番号が与えられている場合に書く) 正しい選択肢を選べ(←与えられている問題文。今回は選択肢式)
 
-1: XOはOXに使われている
+1. XOはOXに使われている
+2. XXではOOの症状がある
+3. XXではOXOが治療薬として使われている
 
-2: XXではOOの症状がある
-
-3: XXではOXOが治療薬として使われている
-
-10. 解答
+解答
 1: XXが使われている。XOが使われているのはOOのような場合。
-2: ✅️ OOは重要な所見の一つ
+2: ✅️ OOは重要な所見の一つ（←真実を述べている選択肢なので✅️がある）
 3: OOの説明。OOはOYが特徴である。XXではBが使われている。
 
 解説
 
-OO疾患はXXの低下によってOXが引き起こされる病気で、AやB、Cという症状もある。
+- OO疾患はXXの低下によってOXが引き起こされる病気で、AやB、Cという症状もある。
+- 鑑別疾患としてXOがあるが、OOとはこのような違いがある
 """  # プロンプトを変更してください
     api_key = os.getenv("OPENAI_API_KEY")  # 環境変数からAPIキーを取得
 

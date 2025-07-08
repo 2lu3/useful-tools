@@ -50,6 +50,6 @@ if __name__ == "__main__":
     df = pd.DataFrame(data, columns=["問題", "解答"])
 
     output_path = Path(__file__).parent / "anki" /  "qa_pairs.csv"
-    df.to_csv(output_path, index=False)
+    df.to_csv(output_path, index=False, header=False)
 
     logger.success(f"CSVを書き出しました: {output_path} (レコード数: {len(df)})")
