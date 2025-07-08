@@ -24,7 +24,6 @@ def send_to_openai(image_path, prompt, api_key):
         response = client.responses.create(
             model="o3",
             reasoning={"effort": "medium"},
-            temperature=0.2,
             input=[
                 {
                     "role": "user",
