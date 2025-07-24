@@ -1,8 +1,9 @@
-from typing import Dict
-import pyautogui as ag
 import argparse
 import math
 import time
+from typing import Dict
+
+import pyautogui as ag
 import toml
 from alive_progress import alive_bar
 

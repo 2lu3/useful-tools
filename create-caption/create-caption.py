@@ -1,10 +1,11 @@
-import PySimpleGUI as sg
-import numpy as np
-import cv2
-from chardet.universaldetector import UniversalDetector
 import re
 from typing import Any, Dict
+
+import cv2
+import numpy as np
 import pyaudio
+import PySimpleGUI as sg
+from chardet.universaldetector import UniversalDetector
 
 
 class Main:

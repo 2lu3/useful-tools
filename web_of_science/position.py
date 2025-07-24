@@ -1,5 +1,6 @@
-import pyautogui
 import time
+
+import pyautogui
 
 while True:
     print(pyautogui.position())

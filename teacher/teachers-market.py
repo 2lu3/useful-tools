@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 
-from dataclasses import dataclass, field
-from typing import List, Dict
 import csv
+import time
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Dict, List
 
 import requests  # HTTP リクエスト用
-
 from bs4 import BeautifulSoup
-import time
 from loguru import logger
-
 
 # サーバーへのリクエスト間隔（秒）
 REQUEST_INTERVAL: int = 1

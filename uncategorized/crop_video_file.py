@@ -1,7 +1,11 @@
-from moviepy.editor import *
+import os
 import subprocess
-import os, tkinter, tkinter.filedialog
+import tkinter
+import tkinter.filedialog
+
 import ffmpeg
+from moviepy.editor import *
+
 
 class Test():
   def __init__(self)

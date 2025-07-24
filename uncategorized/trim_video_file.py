@@ -1,6 +1,10 @@
 # conda install moviepy
 
-import os, tkinter, tkinter.filedialog, tkinter.messagebox
+import os
+import tkinter
+import tkinter.filedialog
+import tkinter.messagebox
+
 from moviepy.editor import *
 
 

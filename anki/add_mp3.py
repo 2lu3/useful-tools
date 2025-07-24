@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-import requests
 import os
-from dataclasses import dataclass
-from google.cloud import texttospeech
 import shutil
-from loguru import logger
 from argparse import ArgumentParser
+from dataclasses import dataclass
 from time import sleep
+
+import requests
+from google.cloud import texttospeech
+from loguru import logger
 
 
 @dataclass

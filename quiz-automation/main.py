@@ -1,12 +1,13 @@
 import csv
-from typing import List, Tuple, Dict
-from tkinter import filedialog
 from dataclasses import dataclass
-import toml
 from time import sleep
+from tkinter import filedialog
+from typing import Dict, List, Tuple
+
 import pyautogui as ag
-from alive_progress import alive_bar
 import pyperclip as clip
+import toml
+from alive_progress import alive_bar
 
 
 def file_selector():

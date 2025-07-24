@@ -1,9 +1,8 @@
-from subprocess import Popen
+import glob
 import os
 import pickle
-import glob
 import time
-
+from subprocess import Popen
 
 # from_file_types = ['MOV', 'MTS']
 # from_file_types = ['MTS']
