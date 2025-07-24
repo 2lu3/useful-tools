@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+import os
+import shutil
+import csv
+import openai
+from PIL import Image
 from pydantic import BaseModel
 from pathlib import Path
 from dataclasses import dataclass
@@ -25,32 +30,69 @@ class Card:
 
 
 def clean_input_dir():
-    # remove all files and directories in the input directory except .gitignore and .gitkeep
-    pass
+    input_dir = Path("input")
+    for item in input_dir.iterdir():
+        if item.name not in [".gitignore", ".gitkeep"]:
+            if item.is_file():
+                item.unlink()
+            elif item.is_dir():
+                shutil.rmtree(item)
+
 
 def clean_output_dir():
-    # remove all files and directories in the output directory except .gitignore and .gitkeep
-    pass
+    output_dir = Path("output")
+    for item in output_dir.iterdir():
+        if item.name not in [".gitignore", ".gitkeep"]:
+            if item.is_file():
+                item.unlink()
+            elif item.is_dir():
+                shutil.rmtree(item)
+
 
 def load_prompt() -> str:
-    # load the prompt from the PROMPT_PATH
-    return ""
+    prompt_path = Path("prompt.txt")
+    with prompt_path.open("r", encoding="utf-8") as f:
+        return f.read()
+
 
 def list_disease_images() -> list[Path]:
-    # list all images which describe diseases from the input directory
-    return []
+    input_dir = Path("input")
+    # 画像拡張子のみ対象
+    exts = [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp"]
+    return [p for p in input_dir.iterdir() if p.suffix.lower() in exts and p.is_file()]
+
 
 def ask_openai(prompt: str, image_path: Path) -> str:
-    # ask OpenAI with the given prompt and image by openai library
-    return ""
+    # OpenAI Vision API (GPT-4o) を利用
+    openai.api_key = os.environ.get("OPENAI_API_KEY")
+    with image_path.open("rb") as img_file:
+        image_bytes = img_file.read()
+    response = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": prompt},
+            {
+                "role": "user",
+                "content": [
+                    # {"type": "text", "text": "この画像について指示に従って説明してください。"},
+                    {"type": "image_url", "image_url": {"url": f"data:image/{image_path.suffix[1:]};base64," + image_bytes.hex()}},
+                ],
+            },
+        ],
+        max_tokens=1024,
+    )
+    return response.choices[0].message.content.strip()
+
 
 def split_front_and_back(text: str) -> Card:
-    # split the text into front and back parts by "説明"
-    # OO
-    # 説明
-    # XX
-    
-    return Card("", "")
+    # "説明" で分割し、前後をfront/backに
+    if "説明" in text:
+        parts = text.split("説明", 1)
+        front = parts[0].strip()
+        back = "説明" + parts[1].strip()
+    else:
+        raise RuntimeError("説明が見つかりませんでした")
+    return Card(front, back)
 
 
 def image2card(prompt: str, image_path: Path) -> Card:
@@ -61,8 +103,12 @@ def image2card(prompt: str, image_path: Path) -> Card:
 
 
 def save_result(cards: list[Card]):
-    # save the result to the OUTPUT_PATH as a csv file
-    pass
+    output_path = Path("output") / "cards.csv"
+    with output_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["front", "back"])
+        for card in cards:
+            writer.writerow([card.front, card.back])
 
 
 def main():
