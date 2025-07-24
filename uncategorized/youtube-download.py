@@ -12,8 +12,12 @@ command_option = ()
 def ask_url():
     url = input("ダウンロードしたいURLを貼り付けて下さい\n")
     if "playlist" in url:
-        video_num_in_playlist = int(input("プレイリスト入っている動画の数を入力して下さい\n"))
-        video_per_channel = int(input("1スレッドあたりいくつ動画をダウンロードするか\n"))
+        video_num_in_playlist = int(
+            input("プレイリスト入っている動画の数を入力して下さい\n")
+        )
+        video_per_channel = int(
+            input("1スレッドあたりいくつ動画をダウンロードするか\n")
+        )
         return url, video_num_in_playlist, video_per_channel
     else:
         return url, None, None
@@ -21,9 +25,9 @@ def ask_url():
 
 def download_one_video(url):
     command = (
-        "youtube-dl -f bestvideo[ext=mp4]+bestaudio[ext=m4a] -o \""
+        'youtube-dl -f bestvideo[ext=mp4]+bestaudio[ext=m4a] -o "'
         + out_dir
-        + "%(title)s\" "
+        + '%(title)s" '
         + url
     )
     print(command)
@@ -37,9 +41,9 @@ def download_playlist(url, video_number, video_per_channel):
         if end >= video_number:
             end = video_number
         command = (
-            "youtube-dl -f bestvideo[ext=mp4]+bestaudio[ext=m4a] -o \""
+            'youtube-dl -f bestvideo[ext=mp4]+bestaudio[ext=m4a] -o "'
             + out_dir
-            + "%(title)s\" "
+            + '%(title)s" '
             + url
             + " --playlist-start "
             + str(start)

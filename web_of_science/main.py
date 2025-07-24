@@ -6,14 +6,17 @@ import time
 import toml
 from alive_progress import alive_bar
 
+
 def wait():
     pass
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("paper_num", type=int)
 
     return parser.parse_args()
+
 
 def wait_to_select_browser():
     for i in range(3):
@@ -37,9 +40,10 @@ def open_tabs(num):
             ag.keyUp("enter")
             bar()
 
+
 def open_tabs_again(num):
     """明示的に開かないと、ページのロードが遅延してしまうことがある"""
-    ctrl_tab_nums = num +1 
+    ctrl_tab_nums = num + 1
     # 一番うしろのタブに移動するため
 
     with alive_bar(ctrl_tab_nums) as bar:
@@ -47,11 +51,13 @@ def open_tabs_again(num):
             ag.hotkey("ctrl", "tab")
             bar()
 
+
 def download(config: Dict, num):
     write_interval = 1 / 10
+
     def _click(x, y):
         ag.moveTo(x, y)
-        ag.click() 
+        ag.click()
 
     with alive_bar(num * 9) as bar:
         for i in range(num):
@@ -73,7 +79,9 @@ def download(config: Dict, num):
             ag.write(str(end), interval=write_interval)
             bar()
 
-            _click(config["export_kind_selector"]["x"], config["export_kind_selector"]["y"])
+            _click(
+                config["export_kind_selector"]["x"], config["export_kind_selector"]["y"]
+            )
             bar()
 
             _click(config["export_kind"]["x"], config["export_kind"]["y"])
@@ -95,18 +103,18 @@ def main():
 
     wait_to_select_browser()
 
-    #print('open new tabs')
-    #open_tabs(download_times)
-    #print('open tabs again')
-    #open_tabs_again(download_times)
+    # print('open new tabs')
+    # open_tabs(download_times)
+    # print('open tabs again')
+    # open_tabs_again(download_times)
 
-    print('waiting to load')
+    print("waiting to load")
     with alive_bar(100) as bar:
         for _ in range(100):
             time.sleep(0.1)
             bar()
 
-    print('download')
+    print("download")
     download(config, download_times)
 
 

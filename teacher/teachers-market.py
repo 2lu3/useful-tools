@@ -42,6 +42,7 @@ class JobListing:
 #  HTML 1 ページをパースして JobListing の list を返す
 # ------------------------------------------------------------
 
+
 def parse_page(html: str) -> List[JobListing]:
     """Teachers-Market の検索結果ページ HTML から JobListing を抽出する。
 
@@ -82,7 +83,9 @@ def parse_page(html: str) -> List[JobListing]:
         catch_copy = catch_tag.get_text(strip=True)
 
         # -------------- タグ一覧 --------------
-        tag_list = [li.get_text(strip=True) for li in box.select("ul.search-box-tag li")]
+        tag_list = [
+            li.get_text(strip=True) for li in box.select("ul.search-box-tag li")
+        ]
 
         # -------------- 詳細テーブル --------------
         wage = working_days = target = location = ""
@@ -105,7 +108,9 @@ def parse_page(html: str) -> List[JobListing]:
                 location = value
             elif label == "最寄り駅":
                 # 中に <span> が複数入るケースがあるので改めて抽出
-                stations = [span.get_text(" ", strip=True) for span in td.select("span")]
+                stations = [
+                    span.get_text(" ", strip=True) for span in td.select("span")
+                ]
 
         # -------------- 検討リスト状態 --------------
         review_btn = box.select_one(".search-box-bt a[ng-click^='addReviewList']")
@@ -117,7 +122,9 @@ def parse_page(html: str) -> List[JobListing]:
 
         # -------------- 詳細ページ URL --------------
         detail_link = box.select_one(".search-box-bt a.solid-bt-newgreen")
-        detail_url = detail_link["href"] if detail_link and detail_link.has_attr("href") else ""
+        detail_url = (
+            detail_link["href"] if detail_link and detail_link.has_attr("href") else ""
+        )
 
         # data class 作成
         listings.append(
@@ -143,7 +150,10 @@ def parse_page(html: str) -> List[JobListing]:
 #  get_page() と合わせて使うユーティリティ関数
 # ------------------------------------------------------------
 
-def get_job_list(page: int) -> List[JobListing]:  # noqa: D401  pylint: disable=invalid-name
+
+def get_job_list(
+    page: int,
+) -> List[JobListing]:  # noqa: D401  pylint: disable=invalid-name
     """Teachers-Market の検索結果を API から取得し ``JobListing`` のリストを返す。
 
     サイトは AngularJS で動的に求人データを取得しており、通常の ``GET`` では
@@ -220,10 +230,7 @@ def get_job_list(page: int) -> List[JobListing]:  # noqa: D401  pylint: disable=
 
     for item in data:
         # --- 基本フィールド -------------------------------------------
-        name = (
-            item.get("offerer", {}).get("nickname")
-            or item.get("_name", "")
-        )
+        name = item.get("offerer", {}).get("nickname") or item.get("_name", "")
 
         job_id = int(item["id"])
         catch_copy = item.get("catch_copy", "")
@@ -246,7 +253,11 @@ def get_job_list(page: int) -> List[JobListing]:  # noqa: D401  pylint: disable=
                 station = item.get(f"station{idx}_station") or ""
                 walk = item.get(f"station{idx}_walktime")
                 if line and station:
-                    s = f"{line} {station} 駅から徒歩 {walk}分" if walk else f"{line} {station}"
+                    s = (
+                        f"{line} {station} 駅から徒歩 {walk}分"
+                        if walk
+                        else f"{line} {station}"
+                    )
                     stations.append(s)
 
         detail_url = f"https://teachers-market.com/teacherjobs/tutor/detail/{job_id}"
@@ -287,32 +298,42 @@ if __name__ == "__main__":
             break
 
     logger.info(f"総求人件数: {len(job_list)}")
-    
+
     # CSVファイルに保存
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     csv_filename = f"teachers_market_jobs_{timestamp}.csv"
-    
-    with open(csv_filename, 'w', newline='', encoding='utf-8') as csvfile:
+
+    with open(csv_filename, "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = [
-            'job_id', 'name', 'catch_copy', 'wage', 'working_days', 
-            'target', 'location', 'stations', 'tags', 'detail_url'
+            "job_id",
+            "name",
+            "catch_copy",
+            "wage",
+            "working_days",
+            "target",
+            "location",
+            "stations",
+            "tags",
+            "detail_url",
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        
+
         writer.writeheader()
         for job in job_list:
-            writer.writerow({
-                'job_id': job.job_id,
-                'name': job.name,
-                'catch_copy': job.catch_copy,
-                'wage': job.wage,
-                'working_days': job.working_days,
-                'target': job.target,
-                'location': job.location,
-                'stations': '; '.join(job.stations),
-                'tags': '; '.join(job.tags),
-                'detail_url': job.detail_url
-            })
-    
+            writer.writerow(
+                {
+                    "job_id": job.job_id,
+                    "name": job.name,
+                    "catch_copy": job.catch_copy,
+                    "wage": job.wage,
+                    "working_days": job.working_days,
+                    "target": job.target,
+                    "location": job.location,
+                    "stations": "; ".join(job.stations),
+                    "tags": "; ".join(job.tags),
+                    "detail_url": job.detail_url,
+                }
+            )
+
     logger.info(f"CSVファイルに保存しました: {csv_filename}")
     print(f"取得した求人情報を {csv_filename} に保存しました")

@@ -66,7 +66,6 @@ def register_a_problem(config: CoordinateConfig, problem: List):
     _wait()
     ag.click(config.add_problem_button)
 
-
     # 問題の入力
     _wait()
     ag.click(config.problem_statement)

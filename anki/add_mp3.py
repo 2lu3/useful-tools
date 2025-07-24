@@ -85,7 +85,6 @@ class Anki:
         )
 
 
-
 def generate_sound(client, text: str):
     synthesis_input = texttospeech.SynthesisInput(text=text)
 
@@ -133,6 +132,7 @@ def add_mp3(client, deck_name: str):
         sleep(0.1)
         anki.add_sound_field(note, "output.mp3")
         logger.debug(f"Updated {note.back}")
+
 
 def validate_not_nbsp(deck_name: str):
     anki = Anki()
