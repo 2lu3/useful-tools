@@ -1,0 +1,13 @@
+[project]
+name = "describe-disease"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "alive-progress>=3.3.0",
+    "loguru>=0.7.3",
+    "openai>=1.97.1",
+    "pillow>=11.3.0",
+    "pydantic-settings>=2.10.1",
+]
