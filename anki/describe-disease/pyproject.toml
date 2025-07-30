@@ -6,8 +6,11 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "alive-progress>=3.3.0",
+    "black>=25.1.0",
     "loguru>=0.7.3",
+    "natsort>=8.4.0",
     "openai>=1.97.1",
+    "pdf2image>=1.17.0",
     "pillow>=11.3.0",
     "pydantic-settings>=2.10.1",
 ]

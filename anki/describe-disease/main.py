@@ -29,26 +29,6 @@ class Card:
     back: str
 
 
-def clean_input_dir():
-    input_dir = Path("input")
-    for item in input_dir.iterdir():
-        if item.name not in [".gitignore", ".gitkeep"]:
-            if item.is_file():
-                item.unlink()
-            elif item.is_dir():
-                shutil.rmtree(item)
-
-
-def clean_output_dir():
-    output_dir = Path("output")
-    for item in output_dir.iterdir():
-        if item.name not in [".gitignore", ".gitkeep"]:
-            if item.is_file():
-                item.unlink()
-            elif item.is_dir():
-                shutil.rmtree(item)
-
-
 def load_prompt() -> str:
     prompt_path = Path("prompt.txt")
     with prompt_path.open("r", encoding="utf-8") as f:
@@ -113,8 +93,6 @@ def save_result(cards: list[Card]):
 
 def main():
     logger.info("Starting describe-disease process...")
-    clean_input_dir()
-    clean_output_dir()
 
     prompt = load_prompt()
     images = list_disease_images()
