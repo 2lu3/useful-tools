@@ -56,7 +56,7 @@ def ask_openai(prompt: str, image_path: Path) -> str:
     with image_path.open("rb") as img_file:
         image_b64 = base64.b64encode(img_file.read()).decode("ascii")
     response = openai.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": prompt},
             {
