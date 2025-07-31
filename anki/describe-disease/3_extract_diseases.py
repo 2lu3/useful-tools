@@ -57,6 +57,7 @@ def ask_openai(prompt: str, image_path: Path) -> str:
         image_b64 = base64.b64encode(img_file.read()).decode("ascii")
     response = openai.chat.completions.create(
         model="gpt-4o",
+        temperature=0.99,
         messages=[
             {"role": "system", "content": prompt},
             {
@@ -81,11 +82,12 @@ def is_explaination_part(path: Path) -> bool:
     # 画像は解説パートと問題パートが存在する
     # OpenAI APIを利用して解説パートなのか問題パートなのかを判定する
 
-    prompt = "画像ページの主な内容を判定してください。主に疾患とその特徴を解説しているならyes、表紙や問題が中心ならnoと答えてください。\n\n"
+    prompt = "画像ページの主な内容を判定してください。主に疾患とその特徴を解説しているなら\"yes\"、表紙や問題が中心なら\"no\"と答えてください。それ以外は出力しないで。\n\n"
 
     try:
         response = ask_openai(prompt, path)
-        return response.lower().strip() == "yes"
+        logger.debug(f"Response for {path}: {response}")
+        return "yes" in response.lower() or "はい" in response
     except Exception as e:
         logger.error(f"Error determining if {path} is explanation part: {e}")
         return True  # エラーの場合は解説パートとして扱う
@@ -96,7 +98,7 @@ def extract_diseases(path: Path) -> list[str]:
     # OpenAI APIを利用して、画像の内容から疾患名を抽出する
     # 疾患名は日本語で返すこと
 
-    prompt = '画像で主に解説している疾患名を","で区切ってすべて抽出してください。\n\n'
+    prompt = '画像のページで特集されている疾患名もしくは事柄を抽出して、\",\"で区切った疾患名のみ出力して。主に説明している疾患とは、そのページ全体がその疾患を記述しているという意味です。ただし、複数の疾患を対比しながら説明している場合はそれらを出力して。それ以外は出力しないで。\n\n'
 
     try:
         response = ask_openai(prompt, path)
