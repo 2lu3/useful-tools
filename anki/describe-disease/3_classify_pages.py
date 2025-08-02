@@ -49,7 +49,7 @@ def classify_page(path: Path) -> str:
 """
 
     try:
-        response = ask_openai(prompt, "", [path], model="o3-pro")
+        response = ask_openai(prompt, "", [path], model="o4-mini")
         if "目次" in response:  
             return "目次"
         elif "説明" in response:
@@ -92,7 +92,7 @@ def main():
 
     # CSVファイルに保存
     csv_path = Path("tmp/classification.csv")
-    with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+    with open(csv_path, 'w', newline='', encoding='utf-8-sig') as csvfile:
         fieldnames = ['page', 'type']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         

@@ -7,3 +7,4 @@ rm -rf output/*
 rm -rf tmp
 
 mkdir -p tmp/image
+mkdir -p tmp/text

@@ -39,7 +39,7 @@ retry_openai = retry(
 
 
 @retry_openai
-def ask_openai(system_prompt: str, user_text: str, images: list[Path], model: str="o3-pro"):
+def ask_openai(system_prompt: str, user_text: str, images: list[Path], model: str):
     content: list[dict] = [{"type": "input_text", "text": user_text}]
 
     for path in images:

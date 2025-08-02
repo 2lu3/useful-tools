@@ -21,7 +21,7 @@ class Card:
 def read_disease_page_index(csv_path: str) -> list[Disease]:
 
     # csv format:
-    # 疾患名, ページ数
+    # name, page
     # Disease A, 1
     # Disease B, 3 
     # Disease C, 4
@@ -31,7 +31,7 @@ def read_disease_page_index(csv_path: str) -> list[Disease]:
     #     Disease(name='Disease A', start_page=1, end_page=2), # max(B's page - 1, A's page)
     #     Disease(name='Disease B', start_page=3, end_page=4), # max(C's page - 1, B's page)
     #     Disease(name='Disease C', start_page=4, end_page=5), # max(C's page - 1, C's page)
-    # ]
+    # ] 
 
     # pandasを使ってCSVファイルを読み込み
     df = pd.read_csv(csv_path, encoding='utf-8')
