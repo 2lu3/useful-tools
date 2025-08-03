@@ -1,69 +1,58 @@
 #!/usr/bin/env python3
 
-from dataclasses import dataclass
-from pathlib import Path
-import pandas as pd
-from util import ask_openai
 import csv
+from pathlib import Path
 from loguru import logger
+from util import ask_openai
 
-@dataclass
-class Disease:
-    name: str
-    start_page: int
-    end_page: int
 
-@dataclass
-class Card:
-    front: str
-    back: str
-
-def read_disease_page_index(csv_path: str) -> list[Disease]:
-
-    # csv format:
-    # name, page
-    # Disease A, 1
-    # Disease B, 3 
-    # Disease C, 4
-
-    # Exepected output:
-    # [
-    #     Disease(name='Disease A', start_page=1, end_page=2), # max(B's page - 1, A's page)
-    #     Disease(name='Disease B', start_page=3, end_page=4), # max(C's page - 1, B's page)
-    #     Disease(name='Disease C', start_page=4, end_page=5), # max(C's page - 1, C's page)
-    # ] 
-
-    # pandasを使ってCSVファイルを読み込み
-    df = pd.read_csv(csv_path, encoding='utf-8')
+def get_disease_page_ranges() -> list[dict]:
+    """disease_page_range.csvから疾患ごとのページ範囲を取得する"""
+    csv_path = Path("tmp/disease_page_range.csv")
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Disease page range file not found: {csv_path}")
     
+    # CSVを読み込み
     diseases = []
+    with open(csv_path, 'r', encoding='utf-8-sig') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            diseases.append({
+                'id': int(row['id']),
+                'name': row['name'],
+                'start': int(row['start']),
+                'end': int(row['end'])
+            })
     
-    for i, row in df.iterrows():
-        name = row['疾患名'].strip()
-        start_page = int(row['ページ数'])
-        
-        # 次の疾患のページを取得（最後の疾患の場合は適当な値）
-        if i + 1 < len(df):
-            next_page = int(df.iloc[i + 1]['ページ数'])
-            end_page = next_page - 1
-        else:
-            # 最後の疾患の場合、start_page + 1 をend_pageとする
-            end_page = start_page + 1
-        
-        # start_pageがend_pageより大きい場合は調整
-        if start_page >= end_page:
-            end_page = start_page + 1
-            
-        diseases.append(Disease(name=name, start_page=start_page, end_page=end_page))
+    if not diseases:
+        raise RuntimeError("No diseases found in disease_page_range.csv")
     
+    logger.info(f"Found {len(diseases)} diseases")
     return diseases
 
-def image2card(disease: Disease) -> Card:
+
+def get_disease_text(disease_id: int) -> str:
+    """疾患IDに対応するテキストファイルを読み込む"""
+    text_path = Path(f"tmp/text/{disease_id:03d}.txt")
+    if not text_path.exists():
+        raise FileNotFoundError(f"Text file not found: {text_path}")
+    
+    with open(text_path, 'r', encoding='utf-8-sig') as f:
+        text = f.read().strip()
+    
+    if not text:
+        raise RuntimeError(f"Text file is empty: {text_path}")
+    
+    logger.debug(f"Loaded text for disease ID {disease_id}: {len(text)} characters")
+    return text
+
+
+def create_card_from_text(disease_name: str, text: str) -> dict:
+    """テキストからAnkiカードを作成する"""
     system_prompt = """多くの疾患もしくはトピックの核心を暗記を目的として、与えられた疾患に対する情報をフォーマットに従い記述して
-疾患もしくはトピックに関連した画像を与えるので、その内容を抽出しまとめて
+疾患もしくはトピックに関連したテキストを与えるので、その内容を抽出しまとめて
 ただし、[]内は指示を記載しているだけなので出力には含めないで
 例として、GERDが与えられたとします
-
 
 GERD (胃食道逆流症)
 
@@ -95,30 +84,23 @@ LES圧の低下
 ・前屈
 ・臥位
 """
-    user_text = f"疾患名: {disease.name}"
-    image_paths = []
-    for i in range(disease.start_page, disease.end_page):
-        path = Path(f"tmp/explaination-{i:03d}.jpeg")
-        if path.exists():
-            image_paths.append(path)
-        else:
-            logger.warning(f"Image file not found: {path}")
-            assert len(image_paths) > 0
-            break
+
+    user_text = f"疾患名: {disease_name}\n\nテキスト内容:\n{text}"
     
-    if not image_paths:
-        print(f"Error: No image files found for disease {disease.name}")
-        return Card(front=disease.name, back="画像ファイルが見つかりませんでした")
-    
-    res = ask_openai(system_prompt, user_text, image_paths, model="o4-mini-2025-04-16")
-    print(f"=== Response for {disease.name} ===")
-    print(res)
-    print("=== End Response ===")
-    card = split_front_and_back(res)
-    return card
+    try:
+        response = ask_openai(system_prompt, user_text, [], model="o4-mini")
+        if not response:
+            raise RuntimeError(f"Empty response from OpenAI for disease '{disease_name}'")
+        
+        logger.debug(f"Generated card for disease '{disease_name}': {len(response)} characters")
+        return split_front_and_back(response)
+        
+    except Exception as e:
+        raise RuntimeError(f"Error creating card for disease '{disease_name}': {e}")
 
 
-def split_front_and_back(text: str) -> Card:
+def split_front_and_back(text: str) -> dict:
+    """テキストをfrontとbackに分割する"""
     # "説明" で分割し、前後をfront/backに
     if "説明" in text:
         parts = text.split("説明", 1)
@@ -134,35 +116,69 @@ def split_front_and_back(text: str) -> Card:
             # 改行がない場合は、テキスト全体をbackに
             front = "疾患情報"
             back = text.strip()
-    return Card(front, back)
+    
+    return {
+        'front': front,
+        'back': back
+    }
 
 
-def initialize_csv():
-    """CSVファイルを初期化する"""
-    output_path = Path("output") / "cards.csv"
+def save_cards_to_csv(cards: list[dict]):
+    """カードをCSVファイルに保存する"""
+    output_path = Path("output/cards.csv")
     output_path.parent.mkdir(exist_ok=True)
-    with output_path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-
-
-def save_card(card: Card):
-    """1件ずつCSVに追記する"""
-    output_path = Path("output") / "cards.csv"
-    with output_path.open("a", encoding="utf-8", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([card.front, card.back])
+    
+    with open(output_path, 'w', newline='', encoding='utf-8-sig') as csvfile:
+        fieldnames = ['front', 'back']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        
+        writer.writeheader()
+        for card in cards:
+            writer.writerow(card)
+    
+    logger.info(f"Saved {len(cards)} cards to {output_path}")
 
 
 def main():
-    # プログラムの最初でCSVを初期化
-    initialize_csv()
-    
-    diseases = read_disease_page_index("input/table.csv")
+    try:
+        # 疾患のページ範囲を取得
+        diseases = get_disease_page_ranges()
+        
+        # 各疾患についてカードを作成
+        cards = []
+        
+        for disease in diseases:
+            disease_name = disease['name']
+            disease_id = disease['id']
+            
+            logger.info(f"Processing disease: {disease_name} (ID: {disease_id})")
+            
+            try:
+                # テキストファイルを読み込み
+                text = get_disease_text(disease_id)
+                
+                # カードを作成
+                card = create_card_from_text(disease_name, text)
+                cards.append(card)
+                
+                logger.info(f"Successfully created card for disease '{disease_name}'")
+                
+            except Exception as e:
+                logger.error(f"Error processing disease '{disease_name}': {e}")
+                continue
+        
+        if not cards:
+            raise RuntimeError("No cards were created successfully")
+        
+        # カードをCSVファイルに保存
+        save_cards_to_csv(cards)
+        
+        logger.info("Anki database creation completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Fatal error in main: {e}")
+        raise
 
-    for disease in diseases:
-        card = image2card(disease)
-        # 1件ずつCSVに追記
-        save_card(card)
 
 if __name__ == "__main__":
     main()
