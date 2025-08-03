@@ -49,8 +49,7 @@ def get_disease_text(disease_id: int) -> str:
 
 def create_card_from_text(disease_name: str, text: str) -> dict:
     """テキストからAnkiカードを作成する"""
-    system_prompt = """多くの疾患もしくはトピックの核心を暗記を目的として、与えられた疾患に対する情報をフォーマットに従い記述して
-疾患もしくはトピックに関連したテキストを与えるので、その内容を抽出しまとめて
+    system_prompt = """指定された疾患/トピックに関して、与えられたテキストの情報のみを情報源として、以下の形式で医学知識を記述してください。
 ただし、[]内は指示を記載しているだけなので出力には含めないで
 例として、GERDが与えられたとします
 
@@ -85,7 +84,7 @@ LES圧の低下
 ・臥位
 """
 
-    user_text = f"疾患名: {disease_name}\n\nテキスト内容:\n{text}"
+    user_text = f"疾患/トピック: {disease_name}\n\nテキスト内容:\n{text}"
     
     try:
         response = ask_openai(system_prompt, user_text, [], model="o4-miyni")
