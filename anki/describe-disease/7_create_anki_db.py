@@ -87,7 +87,7 @@ LES圧の低下
     user_text = f"疾患/トピック: {disease_name}\n\nテキスト内容:\n{text}"
     
     try:
-        response = ask_openai(system_prompt, user_text, [], model="o4-miyni")
+        response = ask_openai(system_prompt, user_text, [], model="o4-mini")
         if not response:
             raise RuntimeError(f"Empty response from OpenAI for disease '{disease_name}'")
         
