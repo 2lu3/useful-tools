@@ -88,7 +88,7 @@ LES圧の低下
     user_text = f"疾患名: {disease_name}\n\nテキスト内容:\n{text}"
     
     try:
-        response = ask_openai(system_prompt, user_text, [], model="o4-mini")
+        response = ask_openai(system_prompt, user_text, [], model="o4-miyni")
         if not response:
             raise RuntimeError(f"Empty response from OpenAI for disease '{disease_name}'")
         
@@ -130,9 +130,9 @@ def save_cards_to_csv(cards: list[dict]):
     
     with open(output_path, 'w', newline='', encoding='utf-8-sig') as csvfile:
         fieldnames = ['front', 'back']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter='\t')
         
-        writer.writeheader()
+        #writer.writeheader()
         for card in cards:
             writer.writerow(card)
     
