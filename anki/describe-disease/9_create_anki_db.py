@@ -3,7 +3,6 @@
 import csv
 from pathlib import Path
 from loguru import logger
-from util import ask_openai
 
 
 def get_disease_page_ranges() -> list[dict]:
@@ -31,75 +30,50 @@ def get_disease_page_ranges() -> list[dict]:
     return diseases
 
 
-def get_disease_text(disease_id: int) -> str:
-    """疾患IDに対応するテキストファイルを読み込む"""
-    text_path = Path(f"tmp/text/{disease_id:03d}.txt")
-    if not text_path.exists():
-        raise FileNotFoundError(f"Text file not found: {text_path}")
+def get_disease_images(disease_id: int, start_page: int, end_page: int) -> list[str]:
+    """疾患のページ範囲に対応する画像のハッシュ値を取得する"""
+    # hashed_images.csvから画像情報を読み込み
+    csv_path = Path("tmp/hashed_images.csv")
+    if not csv_path.exists():
+        logger.warning(f"Hashed images file not found: {csv_path}")
+        return []
     
-    with open(text_path, 'r', encoding='utf-8-sig') as f:
-        text = f.read().strip()
+    images = []
+    with open(csv_path, 'r', encoding='utf-8-sig') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            page = int(row['page'])
+            if start_page <= page <= end_page:
+                images.append(row['hash'])
     
-    if not text:
-        raise RuntimeError(f"Text file is empty: {text_path}")
+    logger.debug(f"Found {len(images)} images for disease ID {disease_id} (pages {start_page}-{end_page})")
+    return images
+
+
+def get_disease_summary(disease_id: int) -> str:
+    """疾患IDに対応する要約ファイルを読み込む"""
+    summary_path = Path(f"tmp/summary/{disease_id:03d}.txt")
+    if not summary_path.exists():
+        raise FileNotFoundError(f"Summary file not found: {summary_path}")
     
-    logger.debug(f"Loaded text for disease ID {disease_id}: {len(text)} characters")
-    return text
-
-
-def create_card_from_text(disease_name: str, text: str) -> dict:
-    """テキストからAnkiカードを作成する"""
-    system_prompt = """指定された疾患/トピックに関して、与えられたテキストの情報のみを情報源として、以下の形式で医学知識を記述してください。
-ただし、[]内は指示を記載しているだけなので出力には含めないで
-例として、GERDが与えられたとします
-
-GERD (胃食道逆流症)
-
-説明
-1. 一言でいうと[簡潔に文章でその疾患の本質を説明する]
-下部食道括約筋(LES)がゆるみ、胃酸が逆流する疾患
-
-2. 機序[このセクションは因果関係スタイルで説明する]
-LES圧の低下
-→胃酸逆流
-→酸性環境
-↓
-食道粘膜炎
-→Barret食道(粘膜が円柱上皮に置換される)
-↓
-食道腺癌
-
-3. 典型患者像[覚えるべき観点を疫学的に明らかに有意なもののみ記載して]
-・肥満
-・高脂肪食
-・Ca拮抗薬・亜硝酸薬(高血圧治療)
-
-4. キーワード[関連する疾患などを列挙する]
-・NERD(非びらん性食道逆流症)
-粘膜障害あり→GERD,なし→NERD[必要なら簡単な説明をする]
-
-・食道裂孔ヘルニア
-・妊婦
-・前屈
-・臥位
-"""
-
-    user_text = f"疾患/トピック: {disease_name}\n\nテキスト内容:\n{text}"
+    with open(summary_path, 'r', encoding='utf-8-sig') as f:
+        summary = f.read().strip()
     
-    try:
-        response = ask_openai(system_prompt, user_text, [], model="o4-mini")
-        if not response:
-            raise RuntimeError(f"Empty response from OpenAI for disease '{disease_name}'")
-        
-        logger.debug(f"Generated card for disease '{disease_name}': {len(response)} characters")
-        return split_front_and_back(response)
-        
-    except Exception as e:
-        raise RuntimeError(f"Error creating card for disease '{disease_name}': {e}")
+    if not summary:
+        raise RuntimeError(f"Summary file is empty: {summary_path}")
+    
+    logger.debug(f"Loaded summary for disease ID {disease_id}: {len(summary)} characters")
+    return summary
 
 
-def split_front_and_back(text: str) -> dict:
-    """テキストをfrontとbackに分割する"""
+def create_card_from_summary(disease_name: str, summary: str, images: list[str]) -> dict:
+    """要約からAnkiカードを作成する"""
+    logger.debug(f"Creating card for disease '{disease_name}': {len(summary)} characters")
+    return split_front_and_back(summary, images)
+
+
+def split_front_and_back(text: str, images: list[str]) -> dict:
+    """テキストをfrontとbackに分割し、backに画像を追加する"""
     # "説明" で分割し、前後をfront/backに
     if "説明" in text:
         parts = text.split("説明", 1)
@@ -115,6 +89,13 @@ def split_front_and_back(text: str) -> dict:
             # 改行がない場合は、テキスト全体をbackに
             front = "疾患情報"
             back = text.strip()
+    
+    # backに画像を追加
+    if images:
+        image_html = "\n\n画像:\n"
+        for image_hash in images:
+            image_html += f'<img src="{image_hash}.jpeg">\n'
+        back += image_html
     
     return {
         'front': front,
@@ -149,18 +130,23 @@ def main():
         for disease in diseases:
             disease_name = disease['name']
             disease_id = disease['id']
+            start_page = disease['start']
+            end_page = disease['end']
             
-            logger.info(f"Processing disease: {disease_name} (ID: {disease_id})")
+            logger.info(f"Processing disease: {disease_name} (ID: {disease_id}, pages: {start_page}-{end_page})")
             
             try:
-                # テキストファイルを読み込み
-                text = get_disease_text(disease_id)
+                # 要約ファイルを読み込み
+                summary = get_disease_summary(disease_id)
+                
+                # 疾患の画像を取得
+                images = get_disease_images(disease_id, start_page, end_page)
                 
                 # カードを作成
-                card = create_card_from_text(disease_name, text)
+                card = create_card_from_summary(disease_name, summary, images)
                 cards.append(card)
                 
-                logger.info(f"Successfully created card for disease '{disease_name}'")
+                logger.info(f"Successfully created card for disease '{disease_name}' with {len(images)} images")
                 
             except Exception as e:
                 logger.error(f"Error processing disease '{disease_name}': {e}")
