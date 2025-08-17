@@ -14,6 +14,27 @@ from tenacity import (
 from loguru import logger
 import logging
 from typing import Any
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(toml_file="config.toml")
+    
+    # classification
+    classification_model: str = "gpt-4o-mini"
+    
+    # table_extraction
+    table_extraction_model: str = "o3"
+    
+    # text_extraction
+    text_extraction_model: str = "4o-mini"
+    
+    # summary
+    summary_model: str = "o3"
+
+
+# 設定インスタンスを作成
+settings = Settings()
 
 
 client = OpenAI()
@@ -60,11 +81,11 @@ def ask_openai(system_prompt: str, user_text: str, images: list[Path], model: st
             {"role": "user", "content": content},  # type: ignore
         ],
     )
+    print(response)
 
     # レスポンスからテキストを抽出
-    if response.output and len(response.output) > 1:
-        # 2番目の要素（ResponseOutputMessage）からテキストを取得
-        message = response.output[1]
+    if response.output and len(response.output) > 0:
+        message = response.output[0]
         if hasattr(message, 'content') and message.content:
             # contentの最初の要素からテキストを取得
             text_item = message.content[0]
@@ -72,5 +93,5 @@ def ask_openai(system_prompt: str, user_text: str, images: list[Path], model: st
                 return text_item.text.strip()
     
     # フォールバック
-    return "No response"
+    raise RuntimeError("No response: " + str(response))
 

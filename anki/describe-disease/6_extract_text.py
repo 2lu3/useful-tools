@@ -3,7 +3,7 @@
 import csv
 from pathlib import Path
 from loguru import logger
-from util import ask_openai
+from util import ask_openai, settings
 
 
 def get_disease_page_ranges() -> list[dict]:
@@ -91,7 +91,7 @@ def main():
             try:
                 # OpenAIに画像を送信してテキストを取得
                 logger.info(f"Sending {len(images)} images to OpenAI for disease '{disease_name}'")
-                text = ask_openai(system_prompt, user_text, images, model="o4-mini")
+                text = ask_openai(system_prompt, user_text, images, model=settings.text_extraction_model)
                 
                 # テキストをファイルに保存
                 save_text_to_file(disease['id'], text)

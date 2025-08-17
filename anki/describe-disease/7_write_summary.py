@@ -3,7 +3,7 @@
 import csv
 from pathlib import Path
 from loguru import logger
-from util import ask_openai
+from util import ask_openai, settings
 from alive_progress import alive_bar
 
 
@@ -51,12 +51,15 @@ def get_disease_text(disease_id: int) -> str:
 def create_summary_from_text(disease_name: str, text: str) -> str:
     """テキストから疾患の要約を作成する"""
     system_prompt = """指定された疾患/トピックに関して、与えられたテキストの情報のみを情報源として、以下の形式に従って医学知識を記述してください。
-ただし、[]内は指示を記載しているだけなので出力には含めないで
+注意点
+・難読語の専門用語にはふりがなを()の中につけて。例：血管攣縮(けっかんれんしゅく)
+・[]内は指示を記載しているだけなので出力には含めないで
+
 例として、GERDが与えられたとします
 
 GERD (胃食道逆流症)
 
-説明
+説明[説明と必ず疾患名/トピックの次に書き、その後に記述する]
 1. 一言でいうと[簡潔に文章でその疾患の本質を説明する]
 下部食道括約筋(LES)がゆるみ、胃酸が逆流する疾患
 
@@ -87,7 +90,7 @@ LES圧の低下
 
     user_text = f"疾患/トピック: {disease_name}\n\nテキスト内容:\n{text}"
     
-    response = ask_openai(system_prompt, user_text, [], model="o3")
+    response = ask_openai(system_prompt, user_text, [], model=settings.summary_model)
     if not response:
         raise RuntimeError(f"Empty response from OpenAI for disease '{disease_name}'")
     

@@ -3,7 +3,7 @@
 import csv
 from pathlib import Path
 from loguru import logger
-from util import ask_openai
+from util import ask_openai, settings
 import pandas as pd
 
 
@@ -49,7 +49,7 @@ Disease B, 3
 Disease C, 4"""
 
     try:
-        response = ask_openai(prompt, "", [image_path], model="o3")
+        response = ask_openai(prompt, "", [image_path], model=settings.table_extraction_model)
         if not response:
             raise RuntimeError(f"Empty response from OpenAI for {image_path}")
         return response

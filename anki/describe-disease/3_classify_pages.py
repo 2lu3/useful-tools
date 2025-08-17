@@ -3,7 +3,7 @@
 from natsort import natsorted
 from pathlib import Path
 from loguru import logger
-from util import ask_openai
+from util import ask_openai, settings
 import shutil
 import csv
 
@@ -47,25 +47,20 @@ def classify_page(path: Path) -> str:
 その他では、上3に分類できないものがあります。以下のようなページがあります。
 - 表紙
 """
-
-    try:
-        response = ask_openai(prompt, "", [path], model="o4-mini")
-        if "目次" in response:  
-            return "目次"
-        elif "説明" in response:
-            return "説明"
-        elif "問題" in response:
-            return "問題"
-        elif "その他" in response:
-            return "その他"
-        else:
-            logger.warning(f"Unexpected response for {path}: {response}")
-            return "不明"
+    response = ask_openai(prompt, "", [path], model=settings.classification_model)
+    if "目次" in response:  
+        return "目次"
+    elif "説明" in response:
+        return "説明"
+    elif "問題" in response:
+        return "問題"
+    elif "その他" in response:
+        return "その他"
+    else:
+        logger.warning(f"Unexpected response for {path}: {response}")
+        return "不明"
         
 
-    except Exception as e:
-        logger.error(f"Error determining if {path} is explanation part: {e}")
-        return "不明"
 
 
 def main():

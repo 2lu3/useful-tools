@@ -92,7 +92,7 @@ def split_front_and_back(text: str, images: list[str]) -> dict:
     
     # backに画像を追加
     if images:
-        image_html = "\n\n画像:\n"
+        image_html = "\n"
         for image_hash in images:
             image_html += f'<img src="{image_hash}.jpeg">\n'
         back += image_html
@@ -108,13 +108,19 @@ def save_cards_to_csv(cards: list[dict]):
     output_path = Path("output/cards.csv")
     output_path.parent.mkdir(exist_ok=True)
     
-    with open(output_path, 'w', newline='', encoding='utf-8-sig') as csvfile:
+    with open(output_path, 'w', encoding='utf-8-sig') as csvfile:
         fieldnames = ['front', 'back']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter='\t')
         
         #writer.writeheader()
         for card in cards:
-            writer.writerow(card)
+            # 改行文字をHTMLの<br>タグに変換してAnkiで正しく表示されるようにする
+            front = card['front'].replace('\n', '<br>')
+            back = card['back'].replace('\n', '<br>')
+            writer.writerow({
+                'front': front,
+                'back': back
+            })
     
     logger.info(f"Saved {len(cards)} cards to {output_path}")
 

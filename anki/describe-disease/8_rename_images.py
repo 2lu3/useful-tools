@@ -33,7 +33,7 @@ def main():
     hash_results = []
     
     # ハッシュ化された画像を保存するディレクトリを作成
-    hashed_dir = Path("tmp/hashed_image")
+    hashed_dir = Path("output/image")
     hashed_dir.mkdir(parents=True, exist_ok=True)
 
     for image in images:

@@ -1,0 +1,8 @@
+# models
+# gpt-4o-mini
+# o3
+# o4-mini
+classification_model = "gpt-4o-mini"
+table_extraction_model = "o3"
+text_extraction_model = "o4-mini"
+summary_model = "o3"
