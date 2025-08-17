@@ -3,8 +3,11 @@
 import csv
 from pathlib import Path
 from loguru import logger
-from util import ask_openai, settings
+from util import ask_openai, settings, find_image_file
 import pandas as pd
+
+
+
 
 
 def get_toc_pages() -> list[Path]:
@@ -26,7 +29,7 @@ def get_toc_pages() -> list[Path]:
     missing_images = []
     
     for page_num in toc_pages:
-        image_path = Path(f"tmp/image/{page_num:03d}.jpeg")
+        image_path = find_image_file(page_num)
         if image_path.exists():
             image_paths.append(image_path)
         else:

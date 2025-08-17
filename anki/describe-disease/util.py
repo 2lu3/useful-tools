@@ -18,7 +18,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(toml_file="config.toml")
+    model_config = SettingsConfigDict(
+        toml_file=str(Path(__file__).parent / "config.toml"),
+        case_sensitive=False
+    )
     
     # classification
     classification_model: str = "gpt-4o-mini"
@@ -27,7 +30,7 @@ class Settings(BaseSettings):
     table_extraction_model: str = "o3"
     
     # text_extraction
-    text_extraction_model: str = "4o-mini"
+    text_extraction_model: str = "o4-mini"
     
     # summary
     summary_model: str = "o3"
@@ -84,13 +87,34 @@ def ask_openai(system_prompt: str, user_text: str, images: list[Path], model: st
 
     # レスポンスからテキストを抽出
     if response.output and len(response.output) > 0:
-        message = response.output[0]
-        if hasattr(message, 'content') and message.content:
-            # contentの最初の要素からテキストを取得
-            text_item = message.content[0]
-            if hasattr(text_item, 'text'):
-                return text_item.text.strip()
+        for message in response.output:
+            if message.type != "message":
+                continue
+            if hasattr(message, 'content') and message.content:
+                # contentの最初の要素からテキストを取得
+                text_item = message.content[0]
+                if hasattr(text_item, 'text'):
+                    return text_item.text.strip()
     
     # フォールバック
     raise RuntimeError("No response: " + str(response))
+
+
+def find_image_file(page_num: int) -> Path:
+    """ページ番号に対応する画像ファイルを複数のパターンで検索する"""
+    # 複数のパターンで画像ファイルを検索
+    patterns = [
+        f"tmp/image/{page_num}.jpeg",      # 1桁: 1.jpeg
+        f"tmp/image/{page_num:02d}.jpeg",  # 2桁: 01.jpeg
+        f"tmp/image/{page_num:03d}.jpeg",  # 3桁: 001.jpeg
+        f"tmp/image/{page_num:04d}.jpeg",  # 4桁: 0001.jpeg
+    ]
+    
+    for pattern in patterns:
+        image_path = Path(pattern)
+        if image_path.exists():
+            return image_path
+    
+    # ファイルが見つからない場合は、最初のパターンを返す（エラーハンドリング用）
+    return Path(patterns[0])
 

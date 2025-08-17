@@ -3,7 +3,7 @@
 import csv
 from pathlib import Path
 from loguru import logger
-from util import ask_openai, settings
+from util import ask_openai, settings, find_image_file
 
 
 def get_disease_page_ranges() -> list[dict]:
@@ -36,8 +36,8 @@ def get_page_images(start_page: int, end_page: int) -> list[Path]:
     images = []
     
     for page in range(start_page, end_page + 1):
-        # 4_extract_table.pyと同じ形式で画像パスを生成
-        image_path = Path(f"tmp/image/{page:03d}.jpeg")
+        # find_image_file関数を使用して柔軟に画像パスを生成
+        image_path = find_image_file(page)
         
         if image_path.exists():
             images.append(image_path)
