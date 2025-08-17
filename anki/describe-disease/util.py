@@ -81,7 +81,6 @@ def ask_openai(system_prompt: str, user_text: str, images: list[Path], model: st
             {"role": "user", "content": content},  # type: ignore
         ],
     )
-    print(response)
 
     # レスポンスからテキストを抽出
     if response.output and len(response.output) > 0:
