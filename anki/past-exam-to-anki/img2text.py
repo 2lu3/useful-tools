@@ -85,7 +85,7 @@ def process_images_in_input_directory(prompt, api_key):
         res = send_to_openai(img_path, prompt, api_key)
         return img_path, res
 
-    max_workers = min(100, len(image_files))  # ワーカー数を制限
+    max_workers = min(10, len(image_files))  # ワーカー数を制限
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(worker, img) for img in image_files]
         for future in as_completed(futures):
