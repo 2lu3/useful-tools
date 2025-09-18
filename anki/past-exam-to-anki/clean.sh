@@ -1,5 +1,5 @@
 #!/bin/bash
 
-rm ./text/*.txt
-rm ./input/*.png
-rm ./anki/*.csv
+rm ./text/*
+rm ./input/*
+rm ./anki/*

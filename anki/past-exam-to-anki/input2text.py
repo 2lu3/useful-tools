@@ -79,8 +79,8 @@ def send_text_to_openai(text_content, prompt, api_key):
 
 def send_csv_row_to_openai(csv_row, prompt, api_key):
     """CSVの行データとプロンプトをOpenAI APIに送信する"""
-    # CSVの行を文字列に変換
-    csv_content = ", ".join(csv_row)
+    # CSVの行を文字列に変換（改行文字を除去）
+    csv_content = ", ".join([cell.strip() for cell in csv_row])
     
     # OpenAIクライアントを設定
     client = openai.OpenAI(api_key=api_key)
@@ -134,14 +134,16 @@ def read_text_file(file_path):
 
 
 def read_csv_file(file_path):
-    """CSVファイルを読み込んで各行をリストで返す"""
+    """CSVファイルを読み込んで各行をリストで返す（コンマ区切り）"""
     try:
         rows = []
-        with open(file_path, "r", encoding="utf-8") as f:
-            csv_reader = csv.reader(f)
+        with open(file_path, "r", encoding="utf-8-sig") as f:  # BOMを自動除去
+            csv_reader = csv.reader(f, delimiter=',')
             for row in csv_reader:
                 if row:  # 空行をスキップ
-                    rows.append(row)
+                    # 各セルの前後の空白と改行文字を除去
+                    cleaned_row = [cell.strip().replace('\n', ' ').replace('\r', '') for cell in row]
+                    rows.append(cleaned_row)
         return rows
     except Exception as e:
         logger.error(f"CSVファイル読み込みエラー: {e}")
@@ -210,15 +212,25 @@ def process_files_in_input_directory(prompt, api_key):
                 return file_path, None
             
             csv_results = {}
+            question_counter = 1
+            
             for i, row in enumerate(csv_rows):
                 logger.info(f"CSV行 {i+1} を処理中: {file_path}")
-                res = send_csv_row_to_openai(row, prompt, api_key)
-                if res:
-                    csv_results[f"row_{i+1}"] = res
-                    # 各行の結果を個別に保存
-                    save_csv_result_to_file(file_path, i+1, res, output_dir)
-                else:
-                    logger.error(f"エラー: {file_path}の行{i+1}の処理に失敗しました")
+                
+                # 各行をカンマで分割して各問題を個別に処理
+                for question_text in row:
+                    if question_text.strip():  # 空でない場合のみ処理
+                        logger.info(f"問題 {question_counter} を処理中: {file_path}")
+                        logger.debug(f"問題 {question_counter} の内容: {question_text}")
+                        res = send_csv_row_to_openai([question_text], prompt, api_key)
+                        if res:
+                            csv_results[f"question_{question_counter}"] = res
+                            # 各問題の結果を個別に保存
+                            save_csv_result_to_file(file_path, question_counter, res, output_dir)
+                            question_counter += 1
+                        else:
+                            logger.error(f"エラー: {file_path}の問題{question_counter}の処理に失敗しました")
+                            question_counter += 1
             
             return file_path, csv_results
         else:
@@ -253,7 +265,7 @@ def save_result_to_file(file_path, result, output_dir):
 def save_csv_result_to_file(csv_file_path, row_number, result, output_dir):
     """CSVの各行の結果を個別のファイルで保存"""
     csv_file_name = Path(csv_file_path).stem
-    output_file = output_dir / f"{csv_file_name}_row{row_number}.txt"
+    output_file = output_dir / f"{csv_file_name}_row{row_number:03d}.txt"
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(result)
     logger.info(f"CSV行{row_number}の結果を {output_file} に保存しました。")
@@ -267,6 +279,7 @@ def main():
 全体
 
 - 文字の大きさはすべて同じにして、太字や大文字は使わないで
+- 解答・解説に医学的に誤りがある場合は正しい知識で置き換えて
 
 問題について
 
@@ -289,6 +302,7 @@ def main():
 
 - その問題の理解の助けになる解説を体系的に記述して
 - 必要なら「・」を用いた箇条書きや→を使用して
+- 解答に記載した知識と重複する知識より、専門用語の説明や背景知識などの医学生の勉強の
 
 以下に例を示す。ただし、()は説明なので、実際の出力には入れないこと。
 
