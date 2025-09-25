@@ -1,0 +1,16 @@
+[project]
+name = "photos-metadata-restore"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "alive-progress>=3.3.0",
+    "isort>=6.0.1",
+    "loguru>=0.7.3",
+]
+
+[dependency-groups]
+dev = [
+    "black>=25.9.0",
+]
