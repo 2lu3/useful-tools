@@ -38,6 +38,94 @@ def get_exif_data(image_path):
         print(f"EXIFデータの読み込みエラー ({image_path}): {e}")
         return {}
 
+def get_exif_datetime(exif_data):
+    """
+    EXIFデータから撮影日時を取得する
+    
+    Args:
+        exif_data (dict): EXIFデータの辞書
+        
+    Returns:
+        datetime.datetime: 撮影日時、見つからない場合はNone
+    """
+    datetime_fields = [
+        'DateTime',           # 撮影日時
+        'DateTimeOriginal',   # 撮影日時（オリジナル）
+        'DateTimeDigitized'   # デジタル化日時
+    ]
+    
+    for field in datetime_fields:
+        if field in exif_data and exif_data[field]:
+            try:
+                # EXIF日時フォーマット: "YYYY:MM:DD HH:MM:SS"
+                dt_str = str(exif_data[field])
+                if len(dt_str) >= 19:
+                    return datetime.datetime.strptime(dt_str[:19], '%Y:%m:%d %H:%M:%S')
+            except (ValueError, TypeError):
+                continue
+    
+    return None
+
+def get_gps_data(exif_data):
+    """
+    EXIFデータからGPS情報を取得する
+    
+    Args:
+        exif_data (dict): EXIFデータの辞書
+        
+    Returns:
+        dict: GPS情報の辞書、見つからない場合はNone
+    """
+    if 'GPSInfo' not in exif_data:
+        return None
+    
+    gps_info = exif_data['GPSInfo']
+    gps_data = {}
+    
+    try:
+        # 緯度を取得
+        if 2 in gps_info and 3 in gps_info and 4 in gps_info:
+            lat_deg = float(gps_info[2][0]) / float(gps_info[2][1])
+            lat_min = float(gps_info[2][2]) / float(gps_info[2][3])
+            lat_sec = float(gps_info[2][4]) / float(gps_info[2][5])
+            latitude = lat_deg + lat_min / 60.0 + lat_sec / 3600.0
+            if gps_info[3] == 'S':
+                latitude = -latitude
+            gps_data['latitude'] = latitude
+        
+        # 経度を取得
+        if 4 in gps_info and 5 in gps_info and 6 in gps_info:
+            lon_deg = float(gps_info[4][0]) / float(gps_info[4][1])
+            lon_min = float(gps_info[4][2]) / float(gps_info[4][3])
+            lon_sec = float(gps_info[4][4]) / float(gps_info[4][5])
+            longitude = lon_deg + lon_min / 60.0 + lon_sec / 3600.0
+            if gps_info[5] == 'W':
+                longitude = -longitude
+            gps_data['longitude'] = longitude
+        
+        # 高度を取得
+        if 6 in gps_info:
+            altitude = float(gps_info[6][0]) / float(gps_info[6][1])
+            gps_data['altitude'] = altitude
+        
+        return gps_data if gps_data else None
+        
+    except (ValueError, TypeError, KeyError, IndexError):
+        return None
+
+def get_json_location(json_file):
+    """
+    JSONファイルから位置情報を取得する（実装予定）
+    
+    Args:
+        json_file (Path): JSONファイルのパス
+        
+    Returns:
+        dict: 位置情報の辞書、見つからない場合はNone
+    """
+    # TODO: JSONファイルから位置情報を取得する処理を実装
+    return None
+
 def has_datetime_property(exif_data):
     """
     EXIFデータに撮影日時の情報があるかチェックする
@@ -280,6 +368,92 @@ def filter_photos_without_datetime(base_path):
             else:
                 print(f"     JSON撮影日時: なし")
             print()
+    
+    # metadata.jsonファイルを作成
+    metadata_file = base_path / "output" / "metadata.json"
+    metadata_dict = {}
+    
+    # すべての画像ファイルのメタデータを収集
+    for file_path in all_photo_files:
+        filename = file_path.name
+        exif_data = get_exif_data(str(file_path))
+        
+        # 撮影日時の情報を取得
+        datetime_info = {}
+        has_datetime = False
+        
+        # EXIF撮影日時をチェック
+        exif_datetime = get_exif_datetime(exif_data)
+        if exif_datetime:
+            datetime_info['exif_datetime'] = exif_datetime.strftime('%Y-%m-%dT%H:%M:%S')
+            has_datetime = True
+        
+        # ファイル作成日時を取得
+        creation_time = get_file_creation_time(str(file_path))
+        if creation_time:
+            datetime_info['file_creation_time'] = creation_time.strftime('%Y-%m-%dT%H:%M:%S')
+        
+        # 位置情報をチェック
+        location_info = {}
+        has_location = False
+        
+        # EXIF GPS情報をチェック
+        gps_data = get_gps_data(exif_data)
+        if gps_data:
+            location_info.update(gps_data)
+            location_info['exif_gps'] = True
+            has_location = True
+        else:
+            location_info['exif_gps'] = False
+        
+        # pair.jsonから元ファイルパスを取得してJSONファイルを検索
+        original_source = None
+        for pair in file_pairs:
+            if str(pair['destination']) == str(file_path.resolve()):
+                original_source = pair['source']
+                break
+        
+        json_datetime = None
+        json_location = None
+        metadata_sources = []
+        
+        if original_source:
+            json_file = find_supplemental_metadata(original_source)
+            if json_file:
+                json_datetime = get_json_datetime(json_file)
+                if json_datetime:
+                    datetime_info['json_datetime'] = json_datetime.strftime('%Y-%m-%dT%H:%M:%S')
+                    has_datetime = True
+                    metadata_sources.append('json')
+                
+                # JSONファイルから位置情報も取得（実装が必要）
+                json_location = get_json_location(json_file)
+                if json_location:
+                    location_info.update(json_location)
+                    location_info['json_location'] = True
+                    has_location = True
+                    metadata_sources.append('json')
+                else:
+                    location_info['json_location'] = False
+        
+        # EXIFソースを追加
+        if exif_datetime or gps_data:
+            metadata_sources.append('exif')
+        
+        # メタデータ辞書に追加
+        metadata_dict[filename] = {
+            'datetime': datetime_info if datetime_info else None,
+            'location': location_info if location_info else None,
+            'has_datetime': has_datetime,
+            'has_location': has_location,
+            'metadata_sources': metadata_sources if metadata_sources else []
+        }
+    
+    # metadata.jsonファイルに保存
+    with open(metadata_file, 'w', encoding='utf-8') as f:
+        json.dump(metadata_dict, f, ensure_ascii=False, indent=2)
+    
+    print(f"メタデータ情報を保存しました: {metadata_file}")
     
     # 結果をファイルに保存
     result_file = base_path / "filter_results.txt"

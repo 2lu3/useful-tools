@@ -1,0 +1,13 @@
+{
+  "test_image.jpg": {
+    "datetime": {
+      "file_creation_time": "2025-09-25T01:52:02"
+    },
+    "location": {
+      "exif_gps": false
+    },
+    "has_datetime": false,
+    "has_location": false,
+    "metadata_sources": []
+  }
+}

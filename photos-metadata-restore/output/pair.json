@@ -1,0 +1,8 @@
+[
+  {
+    "source": "/workspace/photos-metadata-restore/output/images/test_image.jpg",
+    "destination": "/workspace/photos-metadata-restore/output/images/test_image.jpg",
+    "filename": "test_image.jpg",
+    "hash": "test_hash_value"
+  }
+]
