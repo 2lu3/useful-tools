@@ -236,6 +236,5 @@ def main():
     logger.info(f"pair.jsonに保存しました: {pair_json_path}")
     logger.info("処理が完了しました")
 
-
 if __name__ == "__main__":
     main()
