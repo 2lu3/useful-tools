@@ -334,7 +334,7 @@ def main():
     
     
     # ファイルを検索
-    all_photo_files = find_image_files(output_path)[:100]
+    all_photo_files = find_image_files(output_path)
     
     # ファイルを処理
     metadata_list, files_with_datetime_and_gps, files_with_datetime_only, files_with_gps_only, files_without_metadata = process_all_files(all_photo_files)
