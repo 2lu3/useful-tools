@@ -1,0 +1,20 @@
+{
+  "ac603c30f7903706da12ecf99e57f4f3.jpg": {
+    "datetime": {
+      "file_creation_time": "2025-09-25T01:50:02.854839"
+    },
+    "location": {},
+    "has_datetime": true,
+    "has_location": false,
+    "metadata_sources": []
+  },
+  "065ee0b246f2a96f175035e9111acdab.png": {
+    "datetime": {
+      "file_creation_time": "2025-09-25T01:50:02.854839"
+    },
+    "location": {},
+    "has_datetime": true,
+    "has_location": false,
+    "metadata_sources": []
+  }
+}

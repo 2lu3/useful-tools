@@ -1,0 +1,16 @@
+{
+  "ac603c30f7903706da12ecf99e57f4f3.jpg": {
+    "original_source": "/workspace/photos-metadata-restore/input/test.jpg",
+    "metadata_file": null,
+    "metadata_type": null,
+    "found": false,
+    "file_exists": false
+  },
+  "065ee0b246f2a96f175035e9111acdab.png": {
+    "original_source": "/workspace/photos-metadata-restore/input/test2.png",
+    "metadata_file": null,
+    "metadata_type": null,
+    "found": false,
+    "file_exists": false
+  }
+}

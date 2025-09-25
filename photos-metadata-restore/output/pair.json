@@ -1,0 +1,14 @@
+[
+  {
+    "source": "/workspace/photos-metadata-restore/input/test.jpg",
+    "destination": "/workspace/photos-metadata-restore/output/images/ac603c30f7903706da12ecf99e57f4f3.jpg",
+    "filename": "ac603c30f7903706da12ecf99e57f4f3.jpg",
+    "hash": "ac603c30f7903706da12ecf99e57f4f3"
+  },
+  {
+    "source": "/workspace/photos-metadata-restore/input/test2.png",
+    "destination": "/workspace/photos-metadata-restore/output/images/065ee0b246f2a96f175035e9111acdab.png",
+    "filename": "065ee0b246f2a96f175035e9111acdab.png",
+    "hash": "065ee0b246f2a96f175035e9111acdab"
+  }
+]

@@ -1,0 +1,19 @@
+メタデータ復元結果
+==================================================
+
+総処理数: 2
+成功: 0
+エラー: 2
+日時復元: 0
+位置復元: 0
+
+失敗したファイル:
+------------------------------
+ファイル: ac603c30f7903706da12ecf99e57f4f3.jpg
+理由: PIL/piexifが利用できません
+パス: /workspace/photos-metadata-restore/output/images/ac603c30f7903706da12ecf99e57f4f3.jpg
+
+ファイル: 065ee0b246f2a96f175035e9111acdab.png
+理由: PIL/piexifが利用できません
+パス: /workspace/photos-metadata-restore/output/images/065ee0b246f2a96f175035e9111acdab.png
+
