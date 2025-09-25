@@ -1,176 +1,240 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Takeoutフォルダー内の写真ファイルをoutputディレクトリに整理するスクリプト
+写真・動画ファイルのコピーとハッシュ化を行うスクリプト
+
+入力ディレクトリから画像ファイルを検索し、ハッシュ値.拡張子の形式で
+output/images/にコピーし、元ファイルとの対応関係をpair.jsonに保存する。
 """
 
+import hashlib
+import json
 import os
 import shutil
-import glob
-import hashlib
-import argparse
-import json
 from pathlib import Path
-import logging
+from typing import Any, Dict, List, Set
 
-# ログ設定
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+from loguru import logger
 
-def create_output_directory(output_path):
-    """outputディレクトリを作成する"""
-    os.makedirs(output_path, exist_ok=True)
-    logger.info(f"Outputディレクトリを作成しました: {output_path}")
-    return True
 
-def find_takeout_directories(base_path):
-    """takeoutで始まるディレクトリを検索する"""
-    takeout_dirs = []
-    for item in os.listdir(base_path):
-        item_path = os.path.join(base_path, item)
-        if os.path.isdir(item_path) and item.lower().startswith('takeout'):
-            takeout_dirs.append(item_path)
-    logger.info(f"見つかったTakeoutディレクトリ: {len(takeout_dirs)}個")
-    return takeout_dirs
+def get_all_extensions(input_dir: Path) -> Set[str]:
+    """
+    入力ディレクトリ下にあるすべてのファイルの拡張子を列挙する
 
-def find_photo_files(directory):
-    """指定されたディレクトリ内の写真ファイルを検索する"""
-    photo_extensions = ['*.jpg', '*.jpeg', '*.JPG', '*.JPEG', '*.png', '*.PNG', 
-                       '*.heic', '*.HEIC', '*.mp4', '*.MP4', '*.mov', '*.MOV']
-    
-    photo_files = []
-    for extension in photo_extensions:
-        pattern = os.path.join(directory, '**', extension)
-        files = glob.glob(pattern, recursive=True)
-        photo_files.extend(files)
-    
-    logger.info(f"{os.path.basename(directory)}から{len(photo_files)}個の写真ファイルを発見")
-    return photo_files
+    Args:
+        input_dir: 入力ディレクトリのパス
 
-def calculate_file_hash(file_path):
-    """ファイルのMD5ハッシュを計算する"""
+    Returns:
+        拡張子のセット（小文字、ドット付き）
+    """
+    extensions = set()
+
+    for file_path in input_dir.rglob("*"):
+        if file_path.is_file():
+            ext = file_path.suffix.lower()
+            if ext:
+                extensions.add(ext)
+
+    return extensions
+
+
+def get_image_extensions() -> Set[str]:
+    """
+    画像ファイルの拡張子を定義する
+
+    Returns:
+        画像拡張子のセット
+    """
+    return {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".bmp",
+        ".tiff",
+        ".tif",
+        ".webp",
+        ".svg",
+        ".ico",
+        ".heic",
+        ".heif",
+        ".raw",
+        ".cr2",
+        ".nef",
+        ".arw",
+        ".dng",
+        ".orf",
+        ".rw2",
+        ".pef",
+        ".srw",
+    }
+
+
+def get_video_extensions() -> Set[str]:
+    """
+    動画ファイルの拡張子を定義する
+
+    Returns:
+        動画拡張子のセット
+    """
+    return {
+        ".mp4",
+        ".avi",
+        ".mov",
+        ".wmv",
+        ".flv",
+        ".webm",
+        ".mkv",
+        ".m4v",
+        ".3gp",
+        ".ogv",
+        ".ts",
+        ".mts",
+        ".m2ts",
+        ".vob",
+    }
+
+
+def calculate_file_hash(file_path: Path) -> str:
+    """
+    ファイルのMD5ハッシュ値を計算する
+
+    Args:
+        file_path: ファイルのパス
+
+    Returns:
+        MD5ハッシュ値（16進数文字列）
+    """
     hash_md5 = hashlib.md5()
+
     with open(file_path, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
+
     return hash_md5.hexdigest()
 
-def copy_photo_file(source_file, output_dir, file_counter):
-    """写真ファイルをoutputディレクトリにコピーする"""
-    # ファイルのハッシュを計算
-    source_hash = calculate_file_hash(source_file)
-    
-    # 拡張子を取得
-    _, ext = os.path.splitext(source_file)
-    if not ext:
-        ext = '.jpg'  # 拡張子がない場合はデフォルトで.jpg
-    
-    # ハッシュベースのファイル名を生成
-    new_filename = f"{source_hash}{ext}"
-    destination = os.path.join(output_dir, new_filename)
-    
-    # ファイルが既に存在する場合はスキップ
-    if os.path.exists(destination):
-        logger.debug(f"同じハッシュのファイルをスキップ: {os.path.basename(source_file)} -> {new_filename}")
-        return "skipped", None
-    
-    # ファイルをコピー
-    shutil.copy2(source_file, destination)
-    logger.debug(f"コピー完了: {os.path.basename(source_file)} -> {new_filename}")
-    
-    # ファイルパスの対応情報を返す
-    return "success", {
-        "source": str(Path(source_file).resolve()),
-        "destination": str(Path(destination).resolve()),
-        "filename": new_filename,
-        "hash": source_hash
-    }
 
-def organize_photos(base_path, output_dir_name="output"):
-    """メイン処理：takeoutフォルダー内の写真を整理する"""
-    base_path = Path(base_path).resolve()
-    output_path = base_path / output_dir_name
-    
-    logger.info(f"写真整理を開始します...")
-    logger.info(f"ベースパス: {base_path}")
-    logger.info(f"出力先: {output_path}")
-    logger.info(f"モード: コピー")
-    
-    # outputディレクトリを作成
-    if not create_output_directory(output_path):
-        return False
-    
-    # takeoutディレクトリを検索
-    takeout_dirs = find_takeout_directories(base_path)
-    if not takeout_dirs:
-        logger.warning("Takeoutディレクトリが見つかりませんでした")
-        return False
-    
-    # 全写真ファイルを収集
-    all_photo_files = []
-    for takeout_dir in takeout_dirs:
-        photo_files = find_photo_files(takeout_dir)
-        all_photo_files.extend(photo_files)
-    
-    logger.info(f"合計{len(all_photo_files)}個の写真ファイルを発見しました")
-    
-    if not all_photo_files:
-        logger.warning("写真ファイルが見つかりませんでした")
-        return False
-    
-    # ファイルをコピー
-    success_count = 0
-    failed_count = 0
-    skipped_count = 0
-    file_pairs = []  # ファイルパスの対応を保存
-    
-    for i, photo_file in enumerate(all_photo_files, 1):
-        result, pair_info = copy_photo_file(photo_file, output_path, i)
-        if result == "success":
-            success_count += 1
-            if pair_info:
-                file_pairs.append(pair_info)
-        elif result == "skipped":
-            skipped_count += 1
-        else:  # "failed"
-            failed_count += 1
-        
-        # 進捗表示
-        if i % 100 == 0 or i == len(all_photo_files):
-            logger.info(f"進捗: {i}/{len(all_photo_files)} ({i/len(all_photo_files)*100:.1f}%)")
-    
-    # ファイルパスの対応をJSONファイルに保存
-    pair_file = output_path / "pair.json"
-    with open(pair_file, 'w', encoding='utf-8') as f:
-        json.dump(file_pairs, f, ensure_ascii=False, indent=2)
-    logger.info(f"ファイルパス対応情報を保存しました: {pair_file}")
-    
-    # 結果表示
-    logger.info(f"写真整理が完了しました！")
-    logger.info(f"処理成功: {success_count}個")
-    logger.info(f"重複スキップ: {skipped_count}個")
-    if failed_count > 0:
-        logger.warning(f"処理失敗: {failed_count}個")
-    
-    return True
+def copy_images_with_hash(input_dir: Path, output_dir: Path) -> List[Dict[str, Any]]:
+    """
+    画像ファイルをハッシュ値.拡張子の形式でコピーする
+
+    Args:
+        input_dir: 入力ディレクトリ
+        output_dir: 出力ディレクトリ
+
+    Returns:
+        コピー情報のリスト
+    """
+    image_extensions = get_image_extensions()
+    pair_data = []
+
+    # 入力ディレクトリから画像ファイルを再帰的に検索
+    image_files = []
+    for file_path in input_dir.rglob("*"):
+        if file_path.is_file() and file_path.suffix.lower() in image_extensions:
+            image_files.append(file_path)
+
+    logger.info(f"見つかった画像ファイル数: {len(image_files)}")
+
+    for source_path in image_files:
+        try:
+            # ハッシュ値を計算
+            file_hash = calculate_file_hash(source_path)
+
+            # 新しいファイル名を作成（ハッシュ値.拡張子）
+            new_filename = f"{file_hash}{source_path.suffix.lower()}"
+            destination_path = output_dir / new_filename
+
+            # ファイルをコピー
+            shutil.copy2(source_path, destination_path)
+
+            # ペア情報を記録
+            pair_info = {
+                "source": str(source_path),
+                "destination": str(destination_path),
+                "filename": new_filename,
+                "hash": file_hash,
+            }
+            pair_data.append(pair_info)
+
+            logger.debug(f"コピー完了: {source_path.name} -> {new_filename}")
+
+        except Exception as e:
+            logger.error(f"ファイルコピーエラー: {source_path} - {e}")
+
+    return pair_data
+
+
+def reset_tmp_directory(tmp_dir: Path) -> None:
+    """
+    tmpディレクトリをリセットする（削除して再作成）
+
+    Args:
+        tmp_dir: tmpディレクトリのパス
+    """
+    if tmp_dir.exists():
+        shutil.rmtree(tmp_dir)
+        logger.info("tmpディレクトリを削除しました")
+
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("tmpディレクトリを作成しました")
+
 
 def main():
-    """メイン関数"""
-    parser = argparse.ArgumentParser(description='Takeoutフォルダー内の写真ファイルを整理します')
-    parser.add_argument('--output', default='output', 
-                       help='出力ディレクトリ名 (デフォルト: output)')
-    parser.add_argument('--path', default=None,
-                       help='処理するベースパス (デフォルト: スクリプトのあるディレクトリ)')
-    
-    args = parser.parse_args()
-    
-    # ベースパスを決定
-    if args.path:
-        base_path = Path(args.path).resolve()
+    """メイン処理"""
+    # ディレクトリパスの設定
+    base_dir = Path(__file__).parent
+    input_dir = base_dir / "input"
+    output_dir = base_dir / "output"
+    images_dir = output_dir / "images"
+    tmp_dir = base_dir / "tmp"
+    pair_json_path = output_dir / "pair.json"
+
+    # ログの設定
+    logger.add("copy_files.log", rotation="10 MB", retention="7 days")
+
+    logger.info("写真・動画ファイルのコピー処理を開始します")
+
+    # 入力ディレクトリの存在確認
+    if not input_dir.exists():
+        logger.error(f"入力ディレクトリが存在しません: {input_dir}")
+        return
+
+    # tmpディレクトリのリセット
+    reset_tmp_directory(tmp_dir)
+
+    # 出力ディレクトリの作成
+    images_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"出力ディレクトリを作成しました: {images_dir}")
+
+    # すべての拡張子を列挙
+    all_extensions = get_all_extensions(input_dir)
+    logger.info(f"見つかった拡張子: {sorted(all_extensions)}")
+
+    # 画像・動画の拡張子を定義
+    image_extensions = get_image_extensions()
+    video_extensions = get_video_extensions()
+    media_extensions = image_extensions | video_extensions
+
+    # 画像・動画として判定されなかった拡張子を表示
+    unknown_extensions = all_extensions - media_extensions
+    if unknown_extensions:
+        logger.info(
+            f"画像・動画として判定されなかった拡張子: {sorted(unknown_extensions)}"
+        )
     else:
-        base_path = Path(__file__).parent.resolve()
-    
-    organize_photos(base_path, args.output)
+        logger.info("すべてのファイルが画像・動画として認識されました")
+
+    # 画像ファイルのコピーとハッシュ化
+    logger.info("画像ファイルのコピー処理を開始します")
+    pair_data = copy_images_with_hash(input_dir, images_dir)
+
+    # pair.jsonに保存
+    with open(pair_json_path, "w", encoding="utf-8") as f:
+        json.dump(pair_data, f, ensure_ascii=False, indent=2)
+
+    logger.info(f"コピー完了: {len(pair_data)}個のファイル")
+    logger.info(f"pair.jsonに保存しました: {pair_json_path}")
+    logger.info("処理が完了しました")
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,7 @@
 [project]
 name = "photos-metadata-restore"
 version = "0.1.0"
-description = "Add your description here"
+description = ""
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
