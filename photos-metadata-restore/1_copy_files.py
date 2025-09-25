@@ -13,6 +13,7 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Set
 
+from alive_progress import alive_bar
 from loguru import logger
 
 
@@ -135,8 +136,8 @@ def copy_images_with_hash(input_dir: Path, output_dir: Path) -> List[Dict[str, A
 
     logger.info(f"見つかった画像ファイル数: {len(image_files)}")
 
-    for source_path in image_files:
-        try:
+    with alive_bar(len(image_files), title="ファイルコピー中") as bar:
+        for source_path in image_files:
             # ハッシュ値を計算
             file_hash = calculate_file_hash(source_path)
 
@@ -156,10 +157,8 @@ def copy_images_with_hash(input_dir: Path, output_dir: Path) -> List[Dict[str, A
             }
             pair_data.append(pair_info)
 
-            logger.debug(f"コピー完了: {source_path.name} -> {new_filename}")
-
-        except Exception as e:
-            logger.error(f"ファイルコピーエラー: {source_path} - {e}")
+            bar.text(f"コピー完了: {source_path.name} -> {new_filename}")
+            bar()
 
     return pair_data
 
