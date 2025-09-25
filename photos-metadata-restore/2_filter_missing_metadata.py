@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 画像ファイルのメタデータを調査するスクリプト
+共通規格に従って実装
 """
 
 import json
@@ -133,7 +134,7 @@ def get_file_creation_time(file_path):
         return None
 
 def analyze_image_metadata(image_path):
-    """画像のメタデータを分析"""
+    """画像のメタデータを分析（共通規格に従う）"""
     result = {
         "datetime": {},
         "location": {},
@@ -207,7 +208,7 @@ def main():
             logger.error(f"メタデータ分析エラー {image_path}: {e}")
             error_count += 1
     
-    # metadata.jsonを保存
+    # metadata.jsonを保存（共通規格に従う）
     metadata_file = output_dir / "metadata.json"
     with open(metadata_file, 'w', encoding='utf-8') as f:
         json.dump(metadata, f, ensure_ascii=False, indent=2)

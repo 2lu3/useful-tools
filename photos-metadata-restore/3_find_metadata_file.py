@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 メタデータファイルを検索するスクリプト
+共通規格に従って実装
 """
 
 import json
@@ -126,15 +127,16 @@ def main():
                 # メタデータファイルの分析
                 analysis = analyze_metadata_file(metadata_path)
                 
+                # 共通規格に従う
                 metadata_location[filename] = {
                     "original_source": original_source,
                     "metadata_file": str(metadata_path),
                     "metadata_type": metadata_file["pattern"],
                     "found": True,
-                    "file_exists": True,
-                    "analysis": analysis
+                    "file_exists": True
                 }
             else:
+                # 共通規格に従う
                 metadata_location[filename] = {
                     "original_source": original_source,
                     "metadata_file": None,
@@ -149,7 +151,7 @@ def main():
             logger.error(f"メタデータファイル検索エラー {item.get('filename', 'unknown')}: {e}")
             error_count += 1
     
-    # metadata_location.jsonを保存
+    # metadata_location.jsonを保存（共通規格に従う）
     location_file = output_dir / "metadata_location.json"
     with open(location_file, 'w', encoding='utf-8') as f:
         json.dump(metadata_location, f, ensure_ascii=False, indent=2)

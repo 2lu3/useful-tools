@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 画像ファイルをハッシュ値に変換してコピーするスクリプト
+共通規格に従って実装
 """
 
 import os
@@ -119,7 +120,7 @@ def main():
             # ファイルコピー
             shutil.copy2(file_path, dest_path)
             
-            # pair.json用のデータ
+            # pair.json用のデータ（共通規格に従う）
             pair_data.append({
                 "source": str(file_path),
                 "destination": str(dest_path),
@@ -133,7 +134,7 @@ def main():
             logger.error(f"ファイルコピーエラー {file_path}: {e}")
             error_count += 1
     
-    # pair.jsonを保存
+    # pair.jsonを保存（共通規格に従う）
     pair_file = output_dir / "pair.json"
     with open(pair_file, 'w', encoding='utf-8') as f:
         json.dump(pair_data, f, ensure_ascii=False, indent=2)
