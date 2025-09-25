@@ -114,7 +114,7 @@ def calculate_file_hash(file_path: Path) -> str:
     return hash_md5.hexdigest()
 
 
-def copy_images_with_hash(input_dir: Path, output_dir: Path) -> List[Dict[str, Any]]:
+def copy_images_with_hash(input_dir: Path, output_dir: Path) -> tuple[List[Dict[str, Any]], int]:
     """
     画像ファイルをハッシュ値.拡張子の形式でコピーする
 
@@ -123,10 +123,12 @@ def copy_images_with_hash(input_dir: Path, output_dir: Path) -> List[Dict[str, A
         output_dir: 出力ディレクトリ
 
     Returns:
-        コピー情報のリスト
+        (コピー情報のリスト, 重複したためコピーされなかったファイル数)
     """
     image_extensions = get_image_extensions()
     pair_data = []
+    duplicate_count = 0
+    processed_hashes = set()
 
     # 入力ディレクトリから画像ファイルを再帰的に検索
     image_files = []
@@ -145,8 +147,18 @@ def copy_images_with_hash(input_dir: Path, output_dir: Path) -> List[Dict[str, A
             new_filename = f"{file_hash}{source_path.suffix.lower()}"
             destination_path = output_dir / new_filename
 
+            # 重複チェック
+            if file_hash in processed_hashes:
+                duplicate_count += 1
+                bar.text(f"重複スキップ: {source_path.name}")
+                bar()
+                continue
+
             # ファイルをコピー
             shutil.copy2(source_path, destination_path)
+
+            # ハッシュを記録
+            processed_hashes.add(file_hash)
 
             # ペア情報を記録
             pair_info = {
@@ -160,7 +172,7 @@ def copy_images_with_hash(input_dir: Path, output_dir: Path) -> List[Dict[str, A
             bar.text(f"コピー完了: {source_path.name} -> {new_filename}")
             bar()
 
-    return pair_data
+    return pair_data, duplicate_count
 
 
 def reset_tmp_directory(tmp_dir: Path) -> None:
@@ -225,13 +237,14 @@ def main():
 
     # 画像ファイルのコピーとハッシュ化
     logger.info("画像ファイルのコピー処理を開始します")
-    pair_data = copy_images_with_hash(input_dir, images_dir)
+    pair_data, duplicate_count = copy_images_with_hash(input_dir, images_dir)
 
     # pair.jsonに保存
     with open(pair_json_path, "w", encoding="utf-8") as f:
         json.dump(pair_data, f, ensure_ascii=False, indent=2)
 
     logger.info(f"コピー完了: {len(pair_data)}個のファイル")
+    logger.info(f"重複したためコピーされなかったファイル数: {duplicate_count}個")
     logger.info(f"pair.jsonに保存しました: {pair_json_path}")
     logger.info("処理が完了しました")
 

@@ -28,6 +28,7 @@ class PhotoMetadata:
     """写真ファイルのメタデータを管理するdataclass"""
     file_path: Path
     file_name: str  # ファイル名（hash値）
+    original_file_path: Optional[Path] = None  # 元のファイルのパス
     exif_datetime: Optional[datetime.datetime] = None
     file_creation_time: Optional[datetime.datetime] = None
     gps_data: Optional[GPSData] = None
@@ -53,6 +54,7 @@ class PhotoMetadata:
         result = {
             'file_name': self.file_name,
             'file_path': str(self.file_path),
+            'original_file_path': str(self.original_file_path) if self.original_file_path else None,
             'has_datetime': self.has_datetime,
             'has_gps': self.has_gps,
             'has_metadata': self.has_metadata
@@ -104,17 +106,21 @@ def get_file_creation_time(file_path):
     return datetime.datetime.fromtimestamp(file_stat.st_ctime)
 
 
-def process_single_file(file_path: Path) -> PhotoMetadata:
+def process_single_file(file_path: Path, original_file_path: Optional[Path] = None) -> PhotoMetadata:
     """単一ファイルのメタデータを処理する"""
+    # 元のファイルが指定されている場合は、そちらのEXIFデータを取得
+    source_file_path = original_file_path if original_file_path and original_file_path.exists() else file_path
+    
     # EXIFデータを取得
-    exif_data = get_exif_data(str(file_path))
+    exif_data = get_exif_data(str(source_file_path))
     
     # 撮影日時を取得
     exif_datetime = None
     if exif_data is not None:
         exif_datetime = get_exif_datetime(exif_data)
     
-    file_creation_time = get_file_creation_time(str(file_path))
+    # ファイル作成日時は元のファイルから取得
+    file_creation_time = get_file_creation_time(str(source_file_path))
     
     # GPS情報を取得
     gps_data = None
@@ -124,11 +130,34 @@ def process_single_file(file_path: Path) -> PhotoMetadata:
     return PhotoMetadata(
         file_path=file_path,
         file_name=file_path.name,
+        original_file_path=original_file_path,
         exif_datetime=exif_datetime,
         file_creation_time=file_creation_time,
         gps_data=gps_data,
         exif_data=exif_data
     )
+
+def load_pair_mapping(base_path):
+    """pair.jsonファイルを読み込んで、output画像と元ファイルの対応関係を取得する"""
+    pair_file = base_path / "output" / "pair.json"
+    
+    if not pair_file.exists():
+        logger.error(f"pair.jsonファイルが見つかりません: {pair_file}")
+        return {}
+    
+    with open(pair_file, 'r', encoding='utf-8') as f:
+        pair_data = json.load(f)
+    
+    # destination -> source のマッピングを作成
+    mapping = {}
+    for item in pair_data:
+        destination = Path(item['destination'])
+        source = Path(item['source'])
+        mapping[destination] = source
+    
+    logger.info(f"pair.jsonから{len(mapping)}個の対応関係を読み込みました")
+    return mapping
+
 
 def find_image_files(output_path):
     """output/images以下のファイルを検索する"""
@@ -142,7 +171,7 @@ def find_image_files(output_path):
     assert discovered_photo_files, f"ファイルが見つかりませんでした: {images_directory}"
     return discovered_photo_files
 
-def process_all_files(all_photo_files):
+def process_all_files(all_photo_files, pair_mapping):
     """すべてのファイルを処理する"""
     metadata_list = []
     # 4つのカテゴリに分類
@@ -160,7 +189,10 @@ def process_all_files(all_photo_files):
         for file_path in all_photo_files:
             bar.text = f"🔍 分析中: {_format_filename_for_display(file_path.name)}"
             
-            metadata = process_single_file(file_path)
+            # 元のファイルのパスを取得
+            original_file_path = pair_mapping.get(file_path)
+            
+            metadata = process_single_file(file_path, original_file_path)
             metadata_list.append(metadata)
             
             # 4つのカテゴリに分類
@@ -332,12 +364,14 @@ def main():
     assert base_path.exists(), f"ディレクトリ '{base_path}' が存在しません"
     assert output_path.exists(), f"outputディレクトリが存在しません: {output_path}"
     
+    # pair mappingを読み込み
+    pair_mapping = load_pair_mapping(base_path)
     
     # ファイルを検索
     all_photo_files = find_image_files(output_path)
     
     # ファイルを処理
-    metadata_list, files_with_datetime_and_gps, files_with_datetime_only, files_with_gps_only, files_without_metadata = process_all_files(all_photo_files)
+    metadata_list, files_with_datetime_and_gps, files_with_datetime_only, files_with_gps_only, files_without_metadata = process_all_files(all_photo_files, pair_mapping)
     
     # 結果を出力
     print_summary(metadata_list, files_with_datetime_and_gps, files_with_datetime_only, files_with_gps_only, files_without_metadata, len(all_photo_files), base_path)
