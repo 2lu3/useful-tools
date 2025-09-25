@@ -9,59 +9,86 @@ import sys
 import glob
 import json
 from pathlib import Path
-from PIL import Image
-from PIL.ExifTags import TAGS
 import datetime
+from alive_progress import alive_bar
+from loguru import logger
+from dataclasses import dataclass, asdict
+from typing import Optional, Dict, Any
+from utils.exif_utils import get_exif_data, get_exif_datetime, get_gps_data, GPSData
 
-def get_exif_data(image_path):
-    """
-    画像ファイルからEXIFデータを取得する
-    
-    Args:
-        image_path (str): 画像ファイルのパス
-        
-    Returns:
-        dict: EXIFデータの辞書
-    """
-    try:
-        with Image.open(image_path) as image:
-            exifdata = image.getexif()
-            
-            exif_dict = {}
-            for tag_id in exifdata:
-                tag = TAGS.get(tag_id, tag_id)
-                data = exifdata.get(tag_id)
-                exif_dict[tag] = data
-                
-            return exif_dict
-    except Exception as e:
-        print(f"EXIFデータの読み込みエラー ({image_path}): {e}")
-        return {}
 
-def has_datetime_property(exif_data):
-    """
-    EXIFデータに撮影日時の情報があるかチェックする
+# 定数定義
+DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+ISO_DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
+MAX_FILENAME_DISPLAY_LENGTH = 30
+
+
+@dataclass
+class PhotoMetadata:
+    """写真ファイルのメタデータを管理するdataclass"""
+    file_path: Path
+    file_name: str  # ファイル名（hash値）
+    exif_datetime: Optional[datetime.datetime] = None
+    file_creation_time: Optional[datetime.datetime] = None
+    gps_data: Optional[GPSData] = None
+    exif_data: Optional[Dict[str, Any]] = None
     
-    Args:
-        exif_data (dict): EXIFデータの辞書
+    @property
+    def has_datetime(self) -> bool:
+        """撮影日時情報があるかどうか"""
+        return self.exif_datetime is not None
+    
+    @property
+    def has_gps(self) -> bool:
+        """GPS情報があるかどうか"""
+        return self.gps_data is not None
+    
+    @property
+    def has_metadata(self) -> bool:
+        """何らかのメタデータがあるかどうか"""
+        return self.has_datetime or self.has_gps
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """辞書形式に変換（JSON保存用）"""
+        result = {
+            'file_name': self.file_name,
+            'file_path': str(self.file_path),
+            'has_datetime': self.has_datetime,
+            'has_gps': self.has_gps,
+            'has_metadata': self.has_metadata
+        }
         
-    Returns:
-        bool: 撮影日時情報がある場合はTrue
-    """
-    # 撮影日時に関連するEXIFタグ
-    datetime_tags = [
-        'DateTime',
-        'DateTimeOriginal', 
-        'DateTimeDigitized',
-        'CreateDate',
-        'ModifyDate'
-    ]
-    
-    for tag in datetime_tags:
-        if tag in exif_data and exif_data[tag]:
-            return True
-    
-    return False
+        if self.exif_datetime:
+            result['exif_datetime'] = _format_datetime_for_json(self.exif_datetime)
+        
+        if self.file_creation_time:
+            result['file_creation_time'] = _format_datetime_for_json(self.file_creation_time)
+        
+        if self.gps_data:
+            result['gps_data'] = asdict(self.gps_data)
+        
+        return result
+
+
+def _format_filename_for_display(filename):
+    """ファイル名を表示用にフォーマットする"""
+    if len(filename) > MAX_FILENAME_DISPLAY_LENGTH:
+        return f"{filename[:MAX_FILENAME_DISPLAY_LENGTH]}..."
+    return filename
+
+
+def _format_datetime_for_display(dt):
+    """日時を表示用にフォーマットする"""
+    if dt is None:
+        return None
+    return dt.strftime(DATETIME_FORMAT)
+
+
+def _format_datetime_for_json(dt):
+    """日時をJSON用にフォーマットする"""
+    if dt is None:
+        return None
+    return dt.strftime(ISO_DATETIME_FORMAT)
 
 def get_file_creation_time(file_path):
     """
@@ -73,273 +100,247 @@ def get_file_creation_time(file_path):
     Returns:
         datetime.datetime: ファイルの作成日時
     """
-    try:
-        stat = os.stat(file_path)
-        return datetime.datetime.fromtimestamp(stat.st_ctime)
-    except Exception as e:
-        print(f"ファイル作成日時の取得エラー ({file_path}): {e}")
-        return None
+    file_stat = os.stat(file_path)
+    return datetime.datetime.fromtimestamp(file_stat.st_ctime)
 
-def find_takeout_directories(base_path):
-    """takeoutで始まるディレクトリを検索する"""
-    takeout_dirs = []
-    for item in os.listdir(base_path):
-        item_path = os.path.join(base_path, item)
-        if os.path.isdir(item_path) and item.lower().startswith('takeout'):
-            takeout_dirs.append(item_path)
-    print(f"見つかったTakeoutディレクトリ: {len(takeout_dirs)}個")
-    return takeout_dirs
 
-def find_photo_files(directory):
-    """指定されたディレクトリ内の写真ファイルを検索する"""
-    photo_extensions = ['*.jpg', '*.jpeg', '*.JPG', '*.JPEG', '*.png', '*.PNG', 
-                       '*.heic', '*.HEIC', '*.mp4', '*.MP4', '*.mov', '*.MOV']
+def process_single_file(file_path: Path) -> PhotoMetadata:
+    """単一ファイルのメタデータを処理する"""
+    # EXIFデータを取得
+    exif_data = get_exif_data(str(file_path))
     
-    photo_files = []
-    for extension in photo_extensions:
-        pattern = os.path.join(directory, '**', extension)
-        files = glob.glob(pattern, recursive=True)
-        photo_files.extend(files)
+    # 撮影日時を取得
+    exif_datetime = None
+    if exif_data is not None:
+        exif_datetime = get_exif_datetime(exif_data)
     
-    print(f"{os.path.basename(directory)}から{len(photo_files)}個の写真ファイルを発見")
-    return photo_files
+    file_creation_time = get_file_creation_time(str(file_path))
+    
+    # GPS情報を取得
+    gps_data = None
+    if exif_data is not None:
+        gps_data = get_gps_data(exif_data)
+    
+    return PhotoMetadata(
+        file_path=file_path,
+        file_name=file_path.name,
+        exif_datetime=exif_datetime,
+        file_creation_time=file_creation_time,
+        gps_data=gps_data,
+        exif_data=exif_data
+    )
 
-def load_pair_json(output_dir):
-    """output/pair.jsonファイルを読み込む"""
-    pair_file = Path(output_dir) / "pair.json"
-    if not pair_file.exists():
-        print(f"エラー: {pair_file} が存在しません")
-        return None
+def find_image_files(output_path):
+    """output/images以下のファイルを検索する"""
+    images_directory = output_path / "images"
+    discovered_photo_files = []
+    for file_path in images_directory.rglob('*'):
+        if file_path.is_file():
+            discovered_photo_files.append(file_path)
     
-    try:
-        with open(pair_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"エラー: pair.jsonの読み込みに失敗しました: {e}")
-        return None
+    logger.info(f"output/imagesディレクトリから{len(discovered_photo_files)}個のファイルを発見しました")
+    assert discovered_photo_files, f"ファイルが見つかりませんでした: {images_directory}"
+    return discovered_photo_files
 
-def find_supplemental_metadata(source_path):
-    """元ファイルパスから対応するsupplemental-metadata.jsonファイルを検索する"""
-    source_path = Path(source_path)
+def process_all_files(all_photo_files):
+    """すべてのファイルを処理する"""
+    metadata_list = []
+    # 4つのカテゴリに分類
+    files_with_datetime_and_gps = []  # 撮影情報&GPSあり
+    files_with_datetime_only = []    # 撮影情報のみ
+    files_with_gps_only = []         # GPSのみ
+    files_without_metadata = []      # 両方なし
+    total_file_count = len(all_photo_files)
     
-    # 元ファイルと同じディレクトリにある.supplemental-metadata.jsonファイルを探す
-    json_file = source_path.with_suffix(source_path.suffix + '.supplemental-metadata.json')
+    logger.info(f"outputディレクトリ内の写真ファイルをスキャン中...")
+    logger.info("=" * 60)
     
-    if json_file.exists():
-        return json_file
-    
-    # 見つからない場合はNoneを返す
-    return None
-
-def get_json_datetime(json_file):
-    """supplemental-metadata.jsonファイルから撮影日時を取得する"""
-    try:
-        with open(json_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        # photoTakenTimeを優先的に取得
-        if 'photoTakenTime' in data and data['photoTakenTime']:
-            timestamp = data['photoTakenTime'].get('timestamp')
-            if timestamp:
-                return datetime.datetime.fromtimestamp(int(timestamp))
-        
-        # photoTakenTimeがない場合はcreationTimeを使用
-        if 'creationTime' in data and data['creationTime']:
-            timestamp = data['creationTime'].get('timestamp')
-            if timestamp:
-                return datetime.datetime.fromtimestamp(int(timestamp))
-        
-        return None
-    except Exception as e:
-        print(f"JSONファイルの読み込みエラー ({json_file}): {e}")
-        return None
-
-def filter_photos_without_datetime(base_path):
-    """
-    outputディレクトリ内の写真ファイルをチェックし、撮影日時プロパティがないファイルを特定する
-    pair.jsonを参考にして対応するJSONファイルもリストアップする
-    
-    Args:
-        base_path (str): ベースディレクトリのパス
-    """
-    base_path = Path(base_path)
-    output_path = base_path / "output"
-    
-    if not base_path.exists():
-        print(f"エラー: ディレクトリ '{base_path}' が存在しません")
-        return
-    
-    if not output_path.exists():
-        print(f"エラー: outputディレクトリが存在しません")
-        return
-    
-    # pair.jsonを読み込み
-    file_pairs = load_pair_json(output_path)
-    if not file_pairs:
-        return
-    
-    # outputディレクトリ内の写真ファイルを検索
-    photo_extensions = {'.jpg', '.jpeg', '.JPG', '.JPEG', '.heic', '.HEIC', '.png', '.PNG', '.tiff', '.TIFF', '.mp4', '.MP4', '.mov', '.MOV'}
-    
-    all_photo_files = []
-    for file_path in output_path.rglob('*'):
-        if file_path.is_file() and file_path.suffix in photo_extensions:
-            all_photo_files.append(file_path)
-    
-    print(f"outputディレクトリから{len(all_photo_files)}個の写真ファイルを発見しました")
-    
-    if not all_photo_files:
-        print("写真ファイルが見つかりませんでした")
-        return
-    
-    files_without_datetime = []
-    files_with_datetime = []
-    json_files_found = []
-    total_files = len(all_photo_files)
-    
-    print(f"outputディレクトリ内の写真ファイルをスキャン中...")
-    print("-" * 60)
-    
-    # 各写真ファイルをチェック
-    for i, file_path in enumerate(all_photo_files, 1):
-        print(f"チェック中 ({i}/{total_files}): {file_path.name}")
-        
-        # EXIFデータを取得
-        exif_data = get_exif_data(str(file_path))
-        
-        if has_datetime_property(exif_data):
-            files_with_datetime.append(file_path)
-            print(f"  ✓ 撮影日時情報あり")
-        else:
-            # ファイル作成日時を取得して表示
-            creation_time = get_file_creation_time(str(file_path))
-            if creation_time:
-                print(f"  ✗ 撮影日時情報なし (ファイル作成日時: {creation_time.strftime('%Y-%m-%d %H:%M:%S')})")
-            else:
-                print(f"  ✗ 撮影日時情報なし")
+    # 各ファイルを処理（alive-progressを使用）
+    with alive_bar(total_file_count, title="📸 ファイル分析中", bar='smooth', spinner='dots_waves') as bar:
+        for file_path in all_photo_files:
+            bar.text = f"🔍 分析中: {_format_filename_for_display(file_path.name)}"
             
-            files_without_datetime.append(file_path)
+            metadata = process_single_file(file_path)
+            metadata_list.append(metadata)
             
-            # pair.jsonから元ファイルパスを取得
-            original_source = None
-            for pair in file_pairs:
-                if str(pair['destination']) == str(file_path.resolve()):
-                    original_source = pair['source']
-                    break
+            # 4つのカテゴリに分類
+            if metadata.has_datetime and metadata.has_gps:
+                files_with_datetime_and_gps.append(metadata.file_path)
+            elif metadata.has_datetime and not metadata.has_gps:
+                files_with_datetime_only.append(metadata.file_path)
+            elif not metadata.has_datetime and metadata.has_gps:
+                files_with_gps_only.append(metadata.file_path)
+            else:
+                files_without_metadata.append(metadata.file_path)
             
-            if original_source:
-                # 対応するsupplemental-metadata.jsonファイルを検索
-                json_file = find_supplemental_metadata(original_source)
-                if json_file:
-                    json_datetime = get_json_datetime(json_file)
-                    if json_datetime:
-                        print(f"  📄 対応するJSONファイル発見: {json_file.name}")
-                        print(f"     JSON撮影日時: {json_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
-                        json_files_found.append({
-                            'output_file': str(file_path),
-                            'original_source': original_source,
-                            'json_file': str(json_file),
-                            'json_datetime': json_datetime
-                        })
-                    else:
-                        print(f"  📄 対応するJSONファイル発見: {json_file.name} (日付情報なし)")
-                        json_files_found.append({
-                            'output_file': str(file_path),
-                            'original_source': original_source,
-                            'json_file': str(json_file),
-                            'json_datetime': None
-                        })
-                else:
-                    print(f"  ❌ 対応するJSONファイルが見つかりません")
+            # プログレスバーのテキストを更新
+            metadata_status_parts = []
+            if metadata.has_datetime:
+                metadata_status_parts.append("📅日時")
+            if metadata.has_gps:
+                metadata_status_parts.append("📍GPS")
+            
+            if metadata_status_parts:
+                bar.text = f"✅ {','.join(metadata_status_parts)}: {_format_filename_for_display(metadata.file_name)}"
             else:
-                print(f"  ❌ pair.jsonから元ファイルパスが見つかりません")
+                bar.text = f"⚠️  メタデータなし: {_format_filename_for_display(metadata.file_name)}"
+            
+            bar()
     
-    # 結果を表示
-    print("\n" + "=" * 60)
-    print("フィルタリング結果")
-    print("=" * 60)
-    print(f"総ファイル数: {total_files}")
-    print(f"撮影日時情報あり: {len(files_with_datetime)}")
-    print(f"撮影日時情報なし: {len(files_without_datetime)}")
-    print(f"対応するJSONファイル発見: {len(json_files_found)}")
+    return metadata_list, files_with_datetime_and_gps, files_with_datetime_only, files_with_gps_only, files_without_metadata
+
+
+def print_summary(metadata_list, files_with_datetime_and_gps, files_with_datetime_only, files_with_gps_only, files_without_metadata, total_files, base_path):
+    """調査結果のサマリーを出力する"""
+    _print_summary_to_console(files_with_datetime_and_gps, files_with_datetime_only, files_with_gps_only, files_without_metadata, total_files)
+    _create_metadata_json(base_path, metadata_list)
+    _save_results_to_file(files_with_datetime_and_gps, files_with_datetime_only, files_with_gps_only, files_without_metadata, total_files, base_path)
+
+
+def _print_summary_to_console(files_with_datetime_and_gps, files_with_datetime_only, files_with_gps_only, files_without_metadata, total_files):
+    """コンソールに調査結果のサマリーを出力する"""
+    logger.info("\n" + "=" * 60)
+    logger.info("📊 調査結果まとめ")
+    logger.info("=" * 60)
+    logger.info(f"📁 総ファイル数: {total_files}")
+    logger.info(f"📅📍 撮影情報&GPSあり: {len(files_with_datetime_and_gps)}")
+    logger.info(f"📅 撮影情報のみ: {len(files_with_datetime_only)}")
+    logger.info(f"📍 GPSのみ: {len(files_with_gps_only)}")
+    logger.info(f"❌ 両方なし: {len(files_without_metadata)}")
+
+    # 各カテゴリの詳細表示
+    if files_without_metadata:
+        logger.info(f"\n❌ メタデータなしのファイル ({len(files_without_metadata)}件):")
+        logger.info("-" * 40)
+        for i, file_path in enumerate(files_without_metadata, 1):
+            logger.info(f"{i:3d}. {file_path.name}")
     
-    if files_without_datetime:
-        print(f"\n撮影日時情報がないファイル ({len(files_without_datetime)}件):")
-        print("-" * 40)
-        for i, file_path in enumerate(files_without_datetime, 1):
-            print(f"{i:3d}. {file_path.name}")
+    if files_with_gps_only:
+        logger.info(f"\n📍 GPSのみのファイル ({len(files_with_gps_only)}件):")
+        logger.info("-" * 40)
+        for i, file_path in enumerate(files_with_gps_only, 1):
+            logger.info(f"{i:3d}. {file_path.name}")
     
-    if json_files_found:
-        print(f"\n対応するJSONファイルが見つかったファイル ({len(json_files_found)}件):")
-        print("-" * 50)
-        for i, json_info in enumerate(json_files_found, 1):
-            print(f"{i:3d}. {Path(json_info['output_file']).name}")
-            print(f"     JSONファイル: {Path(json_info['json_file']).name}")
-            if json_info['json_datetime']:
-                print(f"     JSON撮影日時: {json_info['json_datetime'].strftime('%Y-%m-%d %H:%M:%S')}")
-            else:
-                print(f"     JSON撮影日時: なし")
-            print()
+    if files_with_datetime_only:
+        logger.info(f"\n📅 撮影情報のみのファイル ({len(files_with_datetime_only)}件):")
+        logger.info("-" * 40)
+        for i, file_path in enumerate(files_with_datetime_only, 1):
+            logger.info(f"{i:3d}. {file_path.name}")
     
-    # 結果をファイルに保存
-    result_file = base_path / "filter_results.txt"
+    if files_with_datetime_and_gps:
+        logger.info(f"\n📅📍 撮影情報&GPSありのファイル ({len(files_with_datetime_and_gps)}件):")
+        logger.info("-" * 40)
+        for i, file_path in enumerate(files_with_datetime_and_gps, 1):
+            logger.info(f"{i:3d}. {file_path.name}")
+
+
+def _create_metadata_json(base_path, metadata_list):
+    """メタデータ情報をJSONファイルに保存する"""
+    metadata_file = base_path / "output" / "metadata.json"
+    metadata_dict = _collect_all_metadata(metadata_list)
+    
+    with open(metadata_file, 'w', encoding='utf-8') as f:
+        json.dump(metadata_dict, f, ensure_ascii=False, indent=2)
+    
+    logger.info(f"💾 メタデータ情報を保存しました: {metadata_file}")
+
+
+def _collect_all_metadata(metadata_list):
+    """すべての画像ファイルのメタデータを収集する"""
+    metadata_dict = {}
+    
+    for metadata in metadata_list:
+        metadata_dict[metadata.file_name] = metadata.to_dict()
+    
+    return metadata_dict
+
+
+def _save_results_to_file(files_with_datetime_and_gps, files_with_datetime_only, files_with_gps_only, files_without_metadata, total_files, base_path):
+    """結果をファイルに保存する"""
+    result_file = base_path / "output" / "filter_results.txt"
+    
     with open(result_file, 'w', encoding='utf-8') as f:
+        # ヘッダー
         f.write("写真ファイルフィルタリング結果\n")
         f.write("=" * 50 + "\n")
-        f.write(f"スキャン日時: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"スキャン日時: {_format_datetime_for_display(datetime.datetime.now())}\n")
         f.write(f"総ファイル数: {total_files}\n")
-        f.write(f"撮影日時情報あり: {len(files_with_datetime)}\n")
-        f.write(f"撮影日時情報なし: {len(files_without_datetime)}\n")
-        f.write(f"対応するJSONファイル発見: {len(json_files_found)}\n\n")
+        f.write(f"📅📍 撮影情報&GPSあり: {len(files_with_datetime_and_gps)}\n")
+        f.write(f"📅 撮影情報のみ: {len(files_with_datetime_only)}\n")
+        f.write(f"📍 GPSのみ: {len(files_with_gps_only)}\n")
+        f.write(f"❌ 両方なし: {len(files_without_metadata)}\n\n")
         
-        if files_without_datetime:
-            f.write("撮影日時情報がないファイル:\n")
+        # 各カテゴリの詳細
+        if files_without_metadata:
+            f.write("❌ メタデータなしのファイル:\n")
             f.write("-" * 30 + "\n")
-            for i, file_path in enumerate(files_without_datetime, 1):
+            for i, file_path in enumerate(files_without_metadata, 1):
                 f.write(f"{i:3d}. {file_path.name}\n")
                 f.write(f"     パス: {file_path}\n")
                 f.write(f"     サイズ: {file_path.stat().st_size} bytes\n")
                 creation_time = get_file_creation_time(str(file_path))
                 if creation_time:
-                    f.write(f"     ファイル作成日時: {creation_time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    f.write(f"     ファイル作成日時: {_format_datetime_for_display(creation_time)}\n")
                 f.write("\n")
         
-        if json_files_found:
-            f.write("\n対応するJSONファイルが見つかったファイル:\n")
-            f.write("-" * 40 + "\n")
-            for i, json_info in enumerate(json_files_found, 1):
-                f.write(f"{i:3d}. {Path(json_info['output_file']).name}\n")
-                f.write(f"     JSONファイル: {Path(json_info['json_file']).name}\n")
-                f.write(f"     元ファイル: {json_info['original_source']}\n")
-                if json_info['json_datetime']:
-                    f.write(f"     JSON撮影日時: {json_info['json_datetime'].strftime('%Y-%m-%d %H:%M:%S')}\n")
-                else:
-                    f.write(f"     JSON撮影日時: なし\n")
+        if files_with_gps_only:
+            f.write("📍 GPSのみのファイル:\n")
+            f.write("-" * 30 + "\n")
+            for i, file_path in enumerate(files_with_gps_only, 1):
+                f.write(f"{i:3d}. {file_path.name}\n")
+                f.write(f"     パス: {file_path}\n")
+                f.write(f"     サイズ: {file_path.stat().st_size} bytes\n")
+                creation_time = get_file_creation_time(str(file_path))
+                if creation_time:
+                    f.write(f"     ファイル作成日時: {_format_datetime_for_display(creation_time)}\n")
+                f.write("\n")
+        
+        if files_with_datetime_only:
+            f.write("📅 撮影情報のみのファイル:\n")
+            f.write("-" * 30 + "\n")
+            for i, file_path in enumerate(files_with_datetime_only, 1):
+                f.write(f"{i:3d}. {file_path.name}\n")
+                f.write(f"     パス: {file_path}\n")
+                f.write(f"     サイズ: {file_path.stat().st_size} bytes\n")
+                creation_time = get_file_creation_time(str(file_path))
+                if creation_time:
+                    f.write(f"     ファイル作成日時: {_format_datetime_for_display(creation_time)}\n")
+                f.write("\n")
+        
+        if files_with_datetime_and_gps:
+            f.write("📅📍 撮影情報&GPSありのファイル:\n")
+            f.write("-" * 30 + "\n")
+            for i, file_path in enumerate(files_with_datetime_and_gps, 1):
+                f.write(f"{i:3d}. {file_path.name}\n")
+                f.write(f"     パス: {file_path}\n")
+                f.write(f"     サイズ: {file_path.stat().st_size} bytes\n")
+                creation_time = get_file_creation_time(str(file_path))
+                if creation_time:
+                    f.write(f"     ファイル作成日時: {_format_datetime_for_display(creation_time)}\n")
                 f.write("\n")
     
-    print(f"\n結果をファイルに保存しました: {result_file}")
+    logger.info(f"💾 結果をファイルに保存しました: {result_file}")
 
 def main():
     """メイン関数"""
     # ベースディレクトリのパスを設定
     script_dir = Path(__file__).parent
+    base_path = script_dir
+    output_path = base_path / "output"
     
-    print("写真ファイルフィルタリングスクリプト")
-    print("=" * 50)
-    print(f"対象ディレクトリ: {script_dir}")
+    # バリデーション
+    assert base_path.exists(), f"ディレクトリ '{base_path}' が存在しません"
+    assert output_path.exists(), f"outputディレクトリが存在しません: {output_path}"
     
-    # 必要なライブラリのチェック
-    try:
-        from PIL import Image
-        from PIL.ExifTags import TAGS
-    except ImportError:
-        print("エラー: Pillowライブラリがインストールされていません")
-        print("以下のコマンドでインストールしてください:")
-        print("pip install Pillow")
-        sys.exit(1)
     
-    # フィルタリング実行
-    filter_photos_without_datetime(str(script_dir))
+    # ファイルを検索
+    all_photo_files = find_image_files(output_path)[:100]
+    
+    # ファイルを処理
+    metadata_list, files_with_datetime_and_gps, files_with_datetime_only, files_with_gps_only, files_without_metadata = process_all_files(all_photo_files)
+    
+    # 結果を出力
+    print_summary(metadata_list, files_with_datetime_and_gps, files_with_datetime_only, files_with_gps_only, files_without_metadata, len(all_photo_files), base_path)
 
 if __name__ == "__main__":
     main()
