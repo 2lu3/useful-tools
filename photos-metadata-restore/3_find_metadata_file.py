@@ -31,7 +31,7 @@ def find_metadata_file_for_image(
     Returns:
         メタデータファイルの情報（見つからない場合はNone）
     """
-    # 元のファイル名を取得
+    # 元のファイル名を取得s
     original_filename = original_source_path.name
 
     # メタデータファイルの候補パターン
@@ -79,33 +79,20 @@ def process_all_images(pair_data: List[Dict[str, Any]]) -> Dict[str, Any]:
     metadata_results = {}
     total_files = len(pair_data)
 
-    logger.info(f"🔍 {total_files}個の画像ファイルのメタデータファイルを検索中...")
+    logger.info(f"{total_files}個の画像ファイルのメタデータファイルを検索中...")
 
     with alive_bar(
         total_files,
-        title="📁 メタデータファイル検索中",
-        bar="smooth",
-        spinner="dots_waves",
     ) as bar:
-        for i, pair_info in enumerate(pair_data):
+        for pair_info in pair_data:
             # 元のファイルパスを取得
             original_source = Path(pair_info["source"])
             hash_filename = pair_info["filename"]
 
-            bar.text = f"🔍 検索中: {hash_filename}"
-
             # メタデータファイルを検索
             metadata_info = find_metadata_file_for_image(original_source)
             metadata_results[hash_filename] = metadata_info
-
-            # プログレスバーのテキストを更新
-            if metadata_info["found"]:
-                bar.text = (
-                    f"✅ 発見: {hash_filename} -> {metadata_info['metadata_type']}"
-                )
-            else:
-                bar.text = f"❌ 未発見: {hash_filename}"
-
+            
             bar()
 
     return metadata_results
@@ -113,55 +100,14 @@ def process_all_images(pair_data: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def save_metadata_location_json(metadata_results: Dict[str, Any], output_path: Path):
     """メタデータファイルの検索結果をJSONファイルに保存する"""
-    metadata_location_file = output_path / "metadata_location.json"
+    metadata_location_file = output_path / "supplemental_file_location.json"
 
     with open(metadata_location_file, "w", encoding="utf-8") as f:
         json.dump(metadata_results, f, ensure_ascii=False, indent=2)
 
     logger.info(
-        f"💾 メタデータファイル検索結果を保存しました: {metadata_location_file}"
+        f"メタデータファイル検索結果を保存しました: {metadata_location_file}"
     )
-
-
-def print_summary(metadata_results: Dict[str, Any]):
-    """検索結果のサマリーを表示する"""
-    total_files = len(metadata_results)
-    found_files = sum(1 for result in metadata_results.values() if result["found"])
-    not_found_files = total_files - found_files
-
-    # メタデータタイプ別の集計
-    metadata_type_counts = {}
-    for result in metadata_results.values():
-        if result["found"]:
-            metadata_type = result["metadata_type"]
-            metadata_type_counts[metadata_type] = (
-                metadata_type_counts.get(metadata_type, 0) + 1
-            )
-
-    logger.info("\n" + "=" * 60)
-    logger.info("📊 メタデータファイル検索結果")
-    logger.info("=" * 60)
-    logger.info(f"📁 総ファイル数: {total_files}")
-    logger.info(f"✅ メタデータファイル発見: {found_files}")
-    logger.info(f"❌ メタデータファイル未発見: {not_found_files}")
-
-    if metadata_type_counts:
-        logger.info("\n📋 メタデータタイプ別集計:")
-        for metadata_type, count in metadata_type_counts.items():
-            logger.info(f"  - {metadata_type}: {count}件")
-
-    # 未発見ファイルの詳細表示（最初の10件のみ）
-    not_found_list = [
-        filename for filename, result in metadata_results.items() if not result["found"]
-    ]
-    if not_found_list:
-        logger.info(f"\n❌ メタデータファイル未発見のファイル (最初の10件):")
-        logger.info("-" * 40)
-        for i, filename in enumerate(not_found_list[:10], 1):
-            logger.info(f"{i:3d}. {filename}")
-
-        if len(not_found_list) > 10:
-            logger.info(f"    ... 他 {len(not_found_list) - 10}件")
 
 
 def main():
@@ -177,12 +123,10 @@ def main():
     assert output_path.exists(), f"outputディレクトリが存在しません: {output_path}"
     assert pair_file_path.exists(), f"pair.jsonファイルが存在しません: {pair_file_path}"
 
-    logger.info("🚀 メタデータファイル検索を開始します")
+    logger.info("メタデータファイル検索を開始します")
 
     # pair.jsonを読み込み
-    logger.info(f"📖 pair.jsonを読み込み中: {pair_file_path}")
     pair_data = load_pair_json(pair_file_path)
-    logger.info(f"📊 {len(pair_data)}個の画像ファイルの情報を読み込みました")
 
     # メタデータファイルを検索
     metadata_results = process_all_images(pair_data)
@@ -190,10 +134,7 @@ def main():
     # 結果を保存
     save_metadata_location_json(metadata_results, output_path)
 
-    # サマリーを表示
-    print_summary(metadata_results)
-
-    logger.info("✅ メタデータファイル検索が完了しました")
+    logger.info("メタデータファイル検索が完了しました")
 
 
 if __name__ == "__main__":

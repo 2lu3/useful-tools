@@ -48,7 +48,7 @@
 }
 ```
 
-### metadata_location.json
+### supplemental_file_location.json
 
 ```json
 {
@@ -89,11 +89,11 @@
 - [ ] output/images下の画像の元の場所は output/pair.jsonに保管されているので、その情報を読み元の画像の場所を把握して
 - [ ] metadataがjson等の形式で保存されているはずなので、どのようなルールでその画像の情報が保存されているかを調査して。これはプログラムに書かずにllmが把握して
   - [ ] 例えば、同じディレクトリで同じファイル名.jsonとなっているとかルールがあるはず
-- [ ] 上で発見したルールに従い、すべての画像ファイルに対して対応するmetadataファイルを調べ、 output/metadata_location.json に保存して
+- [ ] 上で発見したルールに従い、すべての画像ファイルに対して対応するmetadataファイルを調べ、 output/supplemental_file_location.json に保存して
 
 ## 4_restore_metadata.py
 
-- [ ] output/metadata_location.json, output/metada.json, output/pair.jsonを利用し、可能な限り 2_filter_missing_metadata.py で指定したプロパティを復元して
+- [ ] output/supplemental_file_location.json, output/metada.json, output/pair.jsonを利用し、可能な限り 2_filter_missing_metadata.py で指定したプロパティを復元して
 - [ ] レストアできたら、output/imagesの画像のプロパティにその情報を埋め込んで
 - [ ] もし、metadata.jsonに保存されている画像に埋め込まれていたプロパティと、メタデータのファイルに記載されている場合のプロパティが異なる場合は、一旦保持しておいて
 - [ ] もし、情報が足りない場合は一旦保持しておいて

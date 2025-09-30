@@ -22,6 +22,25 @@ class GPSData:
     altitude: Optional[float] = None
 
 
+@dataclass
+class PhotoMetadata:
+    file_name: str
+    exif_datetime: Optional[datetime.datetime] = None
+    exif_gps: Optional[GPSData] = None
+    
+    @property
+    def has_datetime(self) -> bool:
+        return self.exif_datetime is not None
+    
+    @property
+    def has_gps(self) -> bool:
+        return self.exif_gps is not None
+    
+    @property
+    def has_metadata(self) -> bool:
+        return self.has_datetime or self.has_gps
+
+
 def get_exif_data(image_path):
     """
     ExifToolを使って画像ファイルからEXIFデータを取得する

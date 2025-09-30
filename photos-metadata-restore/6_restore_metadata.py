@@ -42,14 +42,14 @@ def load_json_files(
 ) -> Tuple[Dict[str, Any], Dict[str, Any], List[Dict[str, Any]]]:
     """必要なJSONファイルを読み込む"""
     metadata_file = output_path / "metadata.json"
-    metadata_location_file = output_path / "metadata_location.json"
+    metadata_location_file = output_path / "supplemental_file_location.json"
     pair_file = output_path / "pair.json"
 
     # ファイルの存在確認
     assert metadata_file.exists(), f"metadata.jsonが見つかりません: {metadata_file}"
     assert (
         metadata_location_file.exists()
-    ), f"metadata_location.jsonが見つかりません: {metadata_location_file}"
+    ), f"supplemental_file_location.jsonが見つかりません: {metadata_location_file}"
     assert pair_file.exists(), f"pair.jsonが見つかりません: {pair_file}"
 
     # JSONファイルを読み込み
@@ -64,7 +64,7 @@ def load_json_files(
 
     logger.info(f"📖 JSONファイルを読み込みました")
     logger.info(f"  - metadata.json: {len(metadata)}件")
-    logger.info(f"  - metadata_location.json: {len(metadata_location)}件")
+    logger.info(f"  - supplemental_file_location.json: {len(metadata_location)}件")
     logger.info(f"  - pair.json: {len(pair_data)}件")
 
     return metadata, metadata_location, pair_data
