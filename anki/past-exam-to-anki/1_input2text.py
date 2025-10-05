@@ -31,7 +31,7 @@ def send_image_to_openai(image_path, prompt, api_key):
     try:
         response = client.responses.create(
                 #model="o3",
-            model="o3-pro",
+            model="o3-pro-2025-06-10",
             reasoning={"effort": "medium"},
             input=[
                 {
