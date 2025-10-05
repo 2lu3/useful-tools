@@ -30,7 +30,8 @@ def send_image_to_openai(image_path, prompt, api_key):
 
     try:
         response = client.responses.create(
-            model="o3",
+                #model="o3",
+            model="o3-pro",
             reasoning={"effort": "medium"},
             input=[
                 {
@@ -273,14 +274,16 @@ def save_csv_result_to_file(csv_file_path, row_number, result, output_dir):
 
 def main():
     # 設定
+# - 一般には使われないような一部の専門用語にはふりがなを()でつけて
+
     prompt = """
 過去問暗記でAnkiアプリに入れるデータを作成したいので、問題・解答・解説・正誤訂正を記載して
 
 全体
 
 - 文字の大きさはすべて同じにして、太字や大文字は使わないで
-- 一般には使われないような一部の専門用語にはふりがなを()でつけて
 - 解答・解説に医学的に誤りがある場合は正しい知識で置き換えて、その旨を正誤訂正に記載して
+- 一般には使われない専門用語は、最後に専門用語と読み方の一覧を記載して
 
 問題について
 
@@ -327,6 +330,10 @@ def main():
 
 - 解答では1番が正解で根拠としてOOが記載されていたが、OOはXXという理由で誤り
 - 解答ではOXと記述されていたが、OXはOOという理由で誤り
+
+専門用語
+
+- 幽門狭窄症(ゆうもんきょうさくしょう)
 
 """  # プロンプトを変更してください
     api_key = os.getenv("OPENAI_API_KEY")  # 環境変数からAPIキーを取得

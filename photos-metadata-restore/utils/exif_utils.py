@@ -74,10 +74,10 @@ def get_exif_datetime(exif_data):
         'EXIF:DateTimeOriginal', 
         'EXIF:DateTimeDigitized',
         'EXIF:CreateDate',
-        'EXIF:ModifyDate',
-        'File:FileModifyDate',
-        'File:FileAccessDate',
-        'File:FileInodeChangeDate'
+        # 'EXIF:ModifyDate',
+        # 'File:FileModifyDate',
+        # 'File:FileAccessDate',
+        # 'File:FileInodeChangeDate'
     ]
     
     for datetime_field in datetime_fields:
@@ -92,6 +92,7 @@ def get_exif_datetime(exif_data):
             elif ':' in datetime_string and len(datetime_string) >= 19:
                 # EXIF形式: "YYYY:MM:DD HH:MM:SS"
                 return datetime.datetime.strptime(datetime_string[:19], EXIF_DATETIME_FORMAT)
+            assert False, f"日時フォーマットが不明: {datetime_string}"
     
     return None
 

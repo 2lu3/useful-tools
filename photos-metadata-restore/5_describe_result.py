@@ -10,6 +10,7 @@ GPS情報と撮影日時の有無によってファイルを分類してレポ�
 import pickle
 import json
 import os
+import shutil
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from pathlib import Path
@@ -182,113 +183,59 @@ def _compare_datetime(dt1: Optional[datetime], dt2: Optional[datetime]) -> bool:
     return dt1 == dt2
 
 
-def format_gps_info(gps: Optional[GPSData]) -> str:
-    """GPS情報をフォーマットする"""
-    if gps is None:
-        return "なし"
-    lat_str = f"{gps.latitude:.6f}"
-    lon_str = f"{gps.longitude:.6f}"
-    alt_str = f"{gps.altitude:.1f}m" if gps.altitude is not None else "不明"
-    return f"緯度: {lat_str}, 経度: {lon_str}, 高度: {alt_str}"
-
-
-def format_datetime(dt: Optional[datetime]) -> str:
-    """日時をフォーマットする"""
-    if dt is None:
-        return "なし"
-    return dt.strftime("%Y年%m月%d日 %H:%M")
-
-
-def generate_report(categories: Dict[str, List[Dict]], total_files: int, image_video_files: int) -> str:
-    """レポートを生成する（Markdown形式）"""
+def copy_unknown_datetime_files(photo_metadata: List[PhotoMetadata], supplemental_metadata: List[PhotoMetadata], 
+                               hash_to_pair: Dict[str, Dict], image_extensions: List[str], video_extensions: List[str]) -> None:
+    """日時不明のファイルをoutput/日時不明ディレクトリにコピーする"""
     
-    report_lines = []
-    report_lines.append("# 写真・動画メタデータ比較レポート")
-    report_lines.append("")
-    report_lines.append(f"**生成日時:** {datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')}")
-    report_lines.append("")
+    # ハッシュでインデックス化
+    photo_dict = {m.file_name: m for m in photo_metadata}
+    supplemental_dict = {m.file_name: m for m in supplemental_metadata}
     
-    # 統計情報
-    report_lines.append("## 統計情報")
-    report_lines.append("")
-    report_lines.append(f"- **総ファイル数:** {total_files}")
-    report_lines.append(f"- **画像・動画ファイル数:** {image_video_files}")
-    report_lines.append("")
+    # 出力ディレクトリを作成
+    unknown_datetime_dir = Path("output/日時不明")
+    unknown_datetime_dir.mkdir(exist_ok=True)
     
-    # 2x4表形式の統計
-    report_lines.append("## 2x4分類表")
-    report_lines.append("")
-    report_lines.append("| 項目 | 両方一致 | ファイルのみ | supplementalのみ | 両方なし |")
-    report_lines.append("|------|----------|-------------|------------------|----------|")
+    copied_count = 0
     
-    # 各行の統計を計算
-    row_stats = {}
-    for row_prefix in ["GPSあり", "日時あり"]:
-        row_stats[row_prefix] = {
-            "両方一致": len(categories.get(f"{row_prefix}_両方一致", [])),
-            "ファイルのみ": len(categories.get(f"{row_prefix}_ファイルのみ", [])),
-            "supplementalのみ": len(categories.get(f"{row_prefix}_supplementalのみ", [])),
-            "両方なし": len(categories.get(f"{row_prefix}_両方なし", []))
-        }
+    print("\n【日時不明ファイルのコピー処理】")
+    print("=" * 50)
     
-    # 表の各行を出力
-    for row_name, stats in row_stats.items():
-        report_lines.append(f"| {row_name} | {stats['両方一致']} | {stats['ファイルのみ']} | {stats['supplementalのみ']} | {stats['両方なし']} |")
-    
-    report_lines.append("")
-    
-    # 分類別の詳細統計
-    report_lines.append("## 分類別詳細統計")
-    report_lines.append("")
-    for category, files in categories.items():
-        count = len(files)
-        if count > 0:
-            report_lines.append(f"- **{category}:** {count}ファイル")
-    report_lines.append("")
-    
-    # 各分類の詳細
-    for category, files in categories.items():
-        if not files:
-            continue
-            
-        report_lines.append(f"## {category}")
-        report_lines.append("")
-        report_lines.append(f"**件数:** {len(files)}ファイル")
-        report_lines.append("")
+    for hash_filename in photo_dict.keys():
+        photo_data = photo_dict[hash_filename]
+        supplemental_data = supplemental_dict.get(hash_filename)
+        file_type = get_file_type(hash_filename, image_extensions, video_extensions)
         
-        # 画像・動画ファイルのみを対象とする
-        media_files = [f for f in files if f['file_type'] in ['画像', '動画']]
-        
-        if not media_files:
-            report_lines.append("該当する画像・動画ファイルはありません。")
-            report_lines.append("")
-            continue
-        
-        for i, file_info in enumerate(media_files, 1):
-            report_lines.append(f"### ファイル{i}")
-            report_lines.append("")
-            report_lines.append(f"**元ファイル名:** {file_info['original_filename']}")
-            report_lines.append("")
-            report_lines.append(f"**ファイルタイプ:** {file_info['file_type']}")
-            report_lines.append("")
+        # 画像・動画ファイルのみを対象
+        if file_type in ['画像', '動画']:
+            photo_has_datetime = photo_data.exif_datetime is not None
+            supp_has_datetime = supplemental_data.exif_datetime is not None if supplemental_data else False
             
-            # 2列比較表示
-            report_lines.append("| 項目 | Photoメタデータ | Supplementalメタデータ |")
-            report_lines.append("|------|-----------------|------------------------|")
-            
-            # GPS情報
-            photo_gps = format_gps_info(file_info['photo'].exif_gps)
-            supp_gps = format_gps_info(file_info['supplemental'].exif_gps if file_info['supplemental'] else None)
-            report_lines.append(f"| GPS情報 | {photo_gps} | {supp_gps} |")
-            
-            # 日時情報
-            photo_dt = format_datetime(file_info['photo'].exif_datetime)
-            supp_dt = format_datetime(file_info['supplemental'].exif_datetime if file_info['supplemental'] else None)
-            report_lines.append(f"| 撮影日時 | {photo_dt} | {supp_dt} |")
-            
-            report_lines.append("")
+            # 両方とも日時がない場合
+            if not photo_has_datetime and not supp_has_datetime:
+                # 元ファイルのパスを取得
+                hash_value = hash_filename.split('.')[0]
+                if hash_value in hash_to_pair:
+                    source_path = Path(hash_to_pair[hash_value]['source'])
+                    if source_path.exists():
+                        # コピー先のパス
+                        dest_path = unknown_datetime_dir / hash_filename
+                        
+                        try:
+                            shutil.copy2(source_path, dest_path)
+                            copied_count += 1
+                            print(f"コピー完了: {source_path.name} -> {hash_filename}")
+                        except Exception as e:
+                            print(f"コピーエラー: {source_path.name} - {e}")
+                    else:
+                        print(f"元ファイルが見つかりません: {source_path}")
+                else:
+                    print(f"ペア情報が見つかりません: {hash_filename}")
     
-    return "\n".join(report_lines)
+    print(f"\nコピー完了: {copied_count}個のファイルをoutput/日時不明/にコピーしました")
+
+
+
+
 
 
 def main():
@@ -305,24 +252,22 @@ def main():
     print("設定ファイルを読み込み中...")
     image_extensions, video_extensions = load_file_types()
     
-    # メタデータを比較
-    print("メタデータを比較中...")
-    categories, total_files, image_video_files = compare_metadata(
-        photo_metadata, supplemental_metadata, hash_to_pair, image_extensions, video_extensions
-    )
+    # メタデータを直接カウント
+    print("メタデータを分析中...")
     
-    # レポートを生成
-    print("レポートを生成中...")
-    report = generate_report(categories, total_files, image_video_files)
+    # ハッシュでインデックス化
+    photo_dict = {m.file_name: m for m in photo_metadata}
+    supplemental_dict = {m.file_name: m for m in supplemental_metadata}
     
-    # レポートを保存
-    output_path = "output/metadata_comparison_report.md"
-    os.makedirs("output", exist_ok=True)
+    total_files = len(photo_dict)
+    image_video_files = 0
     
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(report)
+    # 画像・動画ファイル数をカウント
+    for hash_filename in photo_dict.keys():
+        file_type = get_file_type(hash_filename, image_extensions, video_extensions)
+        if file_type in ["画像", "動画"]:
+            image_video_files += 1
     
-    print(f"レポートを {output_path} に保存しました。")
     
     # 簡易統計を表示
     print("\n【2x4 Classification Table】")
@@ -332,20 +277,203 @@ def main():
     print(f"{'Item':<8} {'Both Match':<10} {'Media Only':<12} {'Supplemental Only':<18} {'Both None':<10}")
     print("-" * 60)
     
-    # 各行の統計を計算して表示
-    for row_prefix in ["GPSあり", "日時あり"]:
-        stats = {
-            "両方一致": len(categories.get(f"{row_prefix}_両方一致", [])),
-            "ファイルのみ": len(categories.get(f"{row_prefix}_ファイルのみ", [])),
-            "supplementalのみ": len(categories.get(f"{row_prefix}_supplementalのみ", [])),
-            "両方なし": len(categories.get(f"{row_prefix}_両方なし", []))
-        }
-        display_name = row_prefix.replace("GPSあり", "GPS").replace("日時あり", "DateTime")
-        print(f"{display_name:<8} {stats['両方一致']:<10} {stats['ファイルのみ']:<12} {stats['supplementalのみ']:<18} {stats['両方なし']:<10}")
+    # GPSの統計を直接計算
+    gps_both_match = 0
+    gps_media_only = 0
+    gps_supplemental_only = 0
+    gps_both_none = 0
+    
+    for hash_filename in photo_dict.keys():
+        photo_data = photo_dict[hash_filename]
+        supplemental_data = supplemental_dict.get(hash_filename)
+        
+        photo_has_gps = photo_data.exif_gps is not None
+        supp_has_gps = supplemental_data.exif_gps is not None if supplemental_data else False
+        
+        if photo_has_gps and supp_has_gps:
+            gps_match = _compare_gps(photo_data.exif_gps, supplemental_data.exif_gps)
+            if gps_match:
+                gps_both_match += 1
+            else:
+                gps_both_none += 1
+        elif photo_has_gps:
+            gps_media_only += 1
+        elif supp_has_gps:
+            gps_supplemental_only += 1
+        else:
+            gps_both_none += 1
+    
+    # DateTimeの統計を直接計算
+    datetime_both_match = 0
+    datetime_media_only = 0
+    datetime_supplemental_only = 0
+    datetime_both_none = 0
+    
+    for hash_filename in photo_dict.keys():
+        photo_data = photo_dict[hash_filename]
+        supplemental_data = supplemental_dict.get(hash_filename)
+        
+        photo_has_datetime = photo_data.exif_datetime is not None
+        supp_has_datetime = supplemental_data.exif_datetime is not None if supplemental_data else False
+        
+        if photo_has_datetime and supp_has_datetime:
+            datetime_match = _compare_datetime(photo_data.exif_datetime, supplemental_data.exif_datetime)
+            if datetime_match:
+                datetime_both_match += 1
+            else:
+                datetime_both_none += 1
+        elif photo_has_datetime:
+            datetime_media_only += 1
+        elif supp_has_datetime:
+            datetime_supplemental_only += 1
+        else:
+            datetime_both_none += 1
+    
+    print(f"{'GPS':<8} {gps_both_match:<10} {gps_media_only:<12} {gps_supplemental_only:<18} {gps_both_none:<10}")
+    print(f"{'DateTime':<8} {datetime_both_match:<10} {datetime_media_only:<12} {datetime_supplemental_only:<18} {datetime_both_none:<10}")
     
     print()
     print(f"Total files: {total_files}")
     print(f"Media files: {image_video_files}")
+    
+    # 3種類の2x2表を表示
+    
+    # 1. Photoデータのみの場合
+    print("\n【Photo Data Only】")
+    print()
+    photo_gps_has_datetime_has = 0
+    photo_gps_has_datetime_none = 0
+    photo_gps_none_datetime_has = 0
+    photo_gps_none_datetime_none = 0
+    
+    for hash_filename in photo_dict.keys():
+        photo_data = photo_dict[hash_filename]
+        file_type = get_file_type(hash_filename, image_extensions, video_extensions)
+        
+        if file_type in ['画像', '動画']:
+            photo_has_gps = photo_data.exif_gps is not None
+            photo_has_datetime = photo_data.exif_datetime is not None
+            
+            if photo_has_gps and photo_has_datetime:
+                photo_gps_has_datetime_has += 1
+            elif photo_has_gps and not photo_has_datetime:
+                photo_gps_has_datetime_none += 1
+            elif not photo_has_gps and photo_has_datetime:
+                photo_gps_none_datetime_has += 1
+            else:
+                photo_gps_none_datetime_none += 1
+    
+    print(f"{'':<12} {'DateTimeあり':<12} {'DateTimeなし':<12}")
+    print("-" * 40)
+    print(f"{'GPSあり':<12} {photo_gps_has_datetime_has:<12} {photo_gps_has_datetime_none:<12}")
+    print(f"{'GPSなし':<12} {photo_gps_none_datetime_has:<12} {photo_gps_none_datetime_none:<12}")
+    
+    # 2. Supplementalだけの場合
+    print("\n【Supplemental Data Only】")
+    print()
+    supp_gps_has_datetime_has = 0
+    supp_gps_has_datetime_none = 0
+    supp_gps_none_datetime_has = 0
+    supp_gps_none_datetime_none = 0
+    
+    for hash_filename in photo_dict.keys():
+        photo_data = photo_dict[hash_filename]
+        supplemental_data = supplemental_dict.get(hash_filename)
+        file_type = get_file_type(hash_filename, image_extensions, video_extensions)
+        
+        if file_type in ['画像', '動画'] and supplemental_data is not None:
+            supp_has_gps = supplemental_data.exif_gps is not None
+            supp_has_datetime = supplemental_data.exif_datetime is not None
+            
+            if supp_has_gps and supp_has_datetime:
+                supp_gps_has_datetime_has += 1
+            elif supp_has_gps and not supp_has_datetime:
+                supp_gps_has_datetime_none += 1
+            elif not supp_has_gps and supp_has_datetime:
+                supp_gps_none_datetime_has += 1
+            else:
+                supp_gps_none_datetime_none += 1
+    
+    print(f"{'':<12} {'DateTimeあり':<12} {'DateTimeなし':<12}")
+    print("-" * 40)
+    print(f"{'GPSあり':<12} {supp_gps_has_datetime_has:<12} {supp_gps_has_datetime_none:<12}")
+    print(f"{'GPSなし':<12} {supp_gps_none_datetime_has:<12} {supp_gps_none_datetime_none:<12}")
+    
+    # 3. 両方のどっちかがあればよい場合
+    print("\n【Either Photo or Supplemental】")
+    print()
+    either_gps_has_datetime_has = 0
+    either_gps_has_datetime_none = 0
+    either_gps_none_datetime_has = 0
+    either_gps_none_datetime_none = 0
+    
+    for hash_filename in photo_dict.keys():
+        photo_data = photo_dict[hash_filename]
+        supplemental_data = supplemental_dict.get(hash_filename)
+        file_type = get_file_type(hash_filename, image_extensions, video_extensions)
+        
+        if file_type in ['画像', '動画']:
+            photo_has_gps = photo_data.exif_gps is not None
+            photo_has_datetime = photo_data.exif_datetime is not None
+            supp_has_gps = supplemental_data.exif_gps is not None if supplemental_data else False
+            supp_has_datetime = supplemental_data.exif_datetime is not None if supplemental_data else False
+            
+            # どちらかがあればよい
+            has_gps = photo_has_gps or supp_has_gps
+            has_datetime = photo_has_datetime or supp_has_datetime
+            
+            if has_gps and has_datetime:
+                either_gps_has_datetime_has += 1
+            elif has_gps and not has_datetime:
+                either_gps_has_datetime_none += 1
+            elif not has_gps and has_datetime:
+                either_gps_none_datetime_has += 1
+            else:
+                either_gps_none_datetime_none += 1
+    
+    print(f"{'':<12} {'DateTimeあり':<12} {'DateTimeなし':<12}")
+    print("-" * 40)
+    print(f"{'GPSあり':<12} {either_gps_has_datetime_has:<12} {either_gps_has_datetime_none:<12}")
+    print(f"{'GPSなし':<12} {either_gps_none_datetime_has:<12} {either_gps_none_datetime_none:<12}")
+    
+    # 日時もGPSもないファイルの上位10個を表示
+    print("\n【Top 10 files with no datetime and no GPS in both files】")
+    print()
+    
+    no_metadata_files = []
+    for hash_filename in photo_dict.keys():
+        photo_data = photo_dict[hash_filename]
+        supplemental_data = supplemental_dict.get(hash_filename)
+        file_type = get_file_type(hash_filename, image_extensions, video_extensions)
+        
+        if file_type in ['画像', '動画']:
+            photo_has_gps = photo_data.exif_gps is not None
+            photo_has_datetime = photo_data.exif_datetime is not None
+            supp_has_gps = supplemental_data.exif_gps is not None if supplemental_data else False
+            supp_has_datetime = supplemental_data.exif_datetime is not None if supplemental_data else False
+            
+            # 両方ともGPSとDateTimeがない場合
+            if not photo_has_gps and not photo_has_datetime and not supp_has_gps and not supp_has_datetime:
+                no_metadata_files.append({
+                    'hash_filename': hash_filename,
+                    'file_type': file_type
+                })
+    
+    # 上位10個を表示
+    top_10 = no_metadata_files[:10]
+    if top_10:
+        print(f"{'Rank':<4} {'Output Path':<60} {'File Type':<8}")
+        print("-" * 80)
+        for i, file_info in enumerate(top_10, 1):
+            output_path = f"output/images/{file_info['hash_filename']}"
+            print(f"{i:<4} {output_path:<60} {file_info['file_type']:<8}")
+    else:
+        print("No files found with missing datetime and GPS in both files.")
+    
+    # 日時不明ファイルのコピー処理
+    print("\n" + "=" * 60)
+    print("日時不明ファイルのコピー処理を開始します...")
+    copy_unknown_datetime_files(photo_metadata, supplemental_metadata, hash_to_pair, image_extensions, video_extensions)
 
 
 if __name__ == "__main__":

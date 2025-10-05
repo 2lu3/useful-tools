@@ -1,7 +1,8 @@
 #!/bin/bash
 
 rm -rf output/*
-rm -rf tmp
+rm -rf output/images
+rm -rf output/metadata
 
 
 mkdir -p output/images
