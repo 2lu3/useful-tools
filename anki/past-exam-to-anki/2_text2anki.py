@@ -31,7 +31,8 @@ def split_question_answer(text: str, delimiter: str = "解答") -> tuple[str, st
 if __name__ == "__main__":
     # text ディレクトリ配下の *.txt ファイルを列挙
     text_dir = Path(__file__).parent / "text"
-    txt_files = sorted(text_dir.glob("*.txt"))
+    # ファイル名から行番号を抽出して数値順でソート
+    txt_files = sorted(text_dir.glob("*.txt"), key=lambda x: int(x.stem.split('_')[1]))
 
     logger.info(f"{len(txt_files)} 件のテキストファイルを検出しました: {text_dir}")
 

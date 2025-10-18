@@ -78,15 +78,17 @@ def parallel_openai_request(problems: list[Problem]) -> list[Problem]:
             return send_to_openai(prompt=prompt, image_paths=[problem.file.path]), problem
         else:
             return send_to_openai(prompt=prompt, text_content=problem.text), problem
-    results: list[Problem] = []
+    results: list[Problem] = [None] * len(problems)  # 元の順序を保持するためのリスト
     config = load_config()
     prompt = config["prompt"]["content"]
     with alive_bar(len(problems)) as bar:
         with ThreadPoolExecutor(max_workers=config["general"]["max_workers"]) as executor:
-            futures = [executor.submit(worker, prompt, problem) for problem in problems]
+            # 各問題にインデックスを付けて並列処理
+            futures = {executor.submit(worker, prompt, problem): i for i, problem in enumerate(problems)}
             for future in as_completed(futures):
                 result, problem = future.result()
-                results.append(Problem(file=problem.file, text=result, cell_id=problem.cell_id))
+                index = futures[future]
+                results[index] = Problem(file=problem.file, text=result, cell_id=problem.cell_id)
                 bar()
     return results
 
