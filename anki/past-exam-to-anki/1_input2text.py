@@ -8,7 +8,7 @@ from pathlib import Path
 
 from loguru import logger  # ロギングライブラリ
 import pandas as pd
-from util.openai_wrapper import send_to_openai
+from util.llm import ask_llm
 from util.config import load_config
 from typing import Literal
 from dataclasses import dataclass, field
@@ -72,12 +72,12 @@ def file2problem(files: list[File]) -> list[Problem]:
     return results
 
 
-def parallel_openai_request(problems: list[Problem]) -> list[Problem]:
+def parallel_llm_request(problems: list[Problem]) -> list[Problem]:
     def worker(prompt: str, problem: Problem):
         if problem.file.type == "image":
-            return send_to_openai(prompt=prompt, image_paths=[problem.file.path]), problem
+            return ask_llm(prompt=prompt, image_paths=[problem.file.path]), problem
         else:
-            return send_to_openai(prompt=prompt, text_content=problem.text), problem
+            return ask_llm(prompt=prompt, text_content=problem.text), problem
     results: list[Problem] = [None] * len(problems)  # 元の順序を保持するためのリスト
     config = load_config()
     prompt = config["prompt"]["content"]
@@ -112,7 +112,7 @@ def main():
 
     problems = file2problem(files)
 
-    results = parallel_openai_request(problems)
+    results = parallel_llm_request(problems)
 
     for problem in results:
         save_result_to_file(problem)

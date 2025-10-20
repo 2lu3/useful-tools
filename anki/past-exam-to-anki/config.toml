@@ -10,12 +10,16 @@ text = ["*.txt", "*.md"]
 # CSVファイルの拡張子   
 csv = ["*.csv"]
 
-[openai]
+[llm]
+# OpenAIを使用するかどうか（falseの場合はLM Studioなど）
+use_openai = true
 # 使用するモデル（画像・テキスト共通）
 #model = "o3-pro-2025-06-10"
 model = "o3"
 # 推論の努力レベル
 reasoning_effort = "medium"
+# LM StudioなどのエンドポイントURL（use_openai = falseの場合に使用）
+endpoint_url = "http://localhost:1234/v1"
 
 [prompt]
 # Ankiアプリ用の問題・解答・解説生成プロンプト
