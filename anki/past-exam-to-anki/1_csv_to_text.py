@@ -84,7 +84,7 @@ def main():
     
     # 入力ディレクトリと出力ディレクトリを設定
     input_dir = Path(__file__).parent / "input"
-    output_dir = Path(__file__).parent / "output" / "textualized"
+    output_dir = Path(__file__).parent / "output" / "single_problem"
     
     # CSVファイルを検索
     csv_files = search_csv_files(input_dir)

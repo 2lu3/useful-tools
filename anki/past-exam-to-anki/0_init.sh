@@ -5,7 +5,7 @@
 
 echo "ディレクトリ構造を初期化しています..."
 
-rm -rf output
+rm -rf output/*
 
 # outputディレクトリを作成
 mkdir -p output
