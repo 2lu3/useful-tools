@@ -86,7 +86,7 @@ class ImageToAnkiConverter:
             base64_image = self.encode_image(image_path)
             
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4.1-2025-04-14",
                 messages=[
                     {
                         "role": "user",
