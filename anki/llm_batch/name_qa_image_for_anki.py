@@ -93,7 +93,7 @@ class ImageToAnkiConverter:
                         "content": [
                             {
                                 "type": "text",
-                                "text": "この画像は医学部で使われているテキストのスクリーンショットです。画像はある特定のトピックについて記載されています。そのトピックはタイトルとして記載されています。タイトルを探し、そのトピックを答えてください。"
+                                "text": "この画像は医学部で使われているテキストのスクリーンショットです。画像はある特定のトピックについて記載されています。そのトピックはタイトルとして記載されています。タイトルを探し、そのトピックの名称のみを答えてください。名称以外は一切出力しないでください。"
                             },
                             {
                                 "type": "image_url",
@@ -164,8 +164,7 @@ class ImageToAnkiConverter:
         with open(self.csv_file, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.writer(csvfile)
             
-            # ヘッダー行
-            writer.writerow(['問題', '解説'])
+            # ヘッダー行はなし
             
             # データ行
             for question, image_filename in cards_data:
