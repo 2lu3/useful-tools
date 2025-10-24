@@ -29,14 +29,17 @@ class ImageToAnkiConverter:
         self.client = OpenAI(api_key=openai_api_key)
         self.input_dir = Path("input")
         self.output_dir = Path("output")
+        self.image_dir = self.output_dir / "image"
         self.csv_file = self.output_dir / "anki_cards.csv"
         self.max_workers = 5
         
         # 出力ディレクトリを作成
         self.output_dir.mkdir(exist_ok=True)
+        self.image_dir.mkdir(exist_ok=True)
         
         logger.info(f"入力ディレクトリ: {self.input_dir.absolute()}")
         logger.info(f"出力ディレクトリ: {self.output_dir.absolute()}")
+        logger.info(f"画像ディレクトリ: {self.image_dir.absolute()}")
 
     def get_image_files(self) -> List[Path]:
         """
@@ -145,7 +148,7 @@ class ImageToAnkiConverter:
         # 元の拡張子を保持
         extension = image_path.suffix.lower()
         new_filename = f"{file_hash}{extension}"
-        new_path = self.output_dir / new_filename
+        new_path = self.image_dir / new_filename
         
         # ファイルをコピー
         import shutil
@@ -168,8 +171,8 @@ class ImageToAnkiConverter:
             
             # データ行
             for question, image_filename in cards_data:
-                # Ankiの画像表示形式: <img src="filename">
-                answer = f'<img src="{image_filename}">'
+                # Ankiの画像表示形式: <img src="image/filename">
+                answer = f'<img src="image/{image_filename}">'
                 writer.writerow([question, answer])
                 
         logger.info(f"Anki用CSVファイルを作成: {self.csv_file}")
