@@ -170,9 +170,8 @@ class ImageToAnkiConverter:
             # ヘッダー行はなし
             
             # データ行
-            for question, image_filename in cards_data:
-                # Ankiの画像表示形式: <img src="image/filename">
-                answer = f'<img src="image/{image_filename}">'
+            for question, image_filename in cards_data:# Ankiの画像表示形式: <img src="image/filename">
+                answer = f'<img src="{image_filename}">'
                 writer.writerow([question, answer])
                 
         logger.info(f"Anki用CSVファイルを作成: {self.csv_file}")
