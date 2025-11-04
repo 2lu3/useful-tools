@@ -11,11 +11,12 @@ import hashlib
 import csv
 import base64
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from loguru import logger
 from openai import OpenAI
 from alive_progress import alive_bar
+from natsort import natsorted
 
 
 class ImageToAnkiConverter:
@@ -58,6 +59,9 @@ class ImageToAnkiConverter:
         for file_path in self.input_dir.iterdir():
             if file_path.is_file() and file_path.suffix in image_extensions:
                 image_files.append(file_path)
+        
+        # natsortでファイル名順にソート
+        image_files = natsorted(image_files, key=lambda x: x.name)
                 
         logger.info(f"見つかった画像ファイル数: {len(image_files)}")
         return image_files
@@ -213,30 +217,34 @@ class ImageToAnkiConverter:
             logger.warning("処理する画像ファイルが見つかりませんでした")
             return
             
-        cards_data = []
+        # ファイル名順を保持するための辞書（インデックスをキーとする）
+        results_dict: Dict[int, Tuple[str, str]] = {}
         
         # alive_progressでプログレスバーを表示
         with alive_bar(len(image_files), title="画像処理中") as bar:
             # ThreadPoolExecutorを使用して並列処理
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                # 各画像の処理を並列実行
+                # 各画像の処理を並列実行（インデックスも保持）
                 future_to_image = {
-                    executor.submit(self.process_single_image, image_path): image_path 
-                    for image_path in image_files
+                    executor.submit(self.process_single_image, image_path): (idx, image_path)
+                    for idx, image_path in enumerate(image_files)
                 }
                 
                 # 完了したタスクから結果を取得
                 for future in as_completed(future_to_image):
-                    image_path = future_to_image[future]
+                    idx, image_path = future_to_image[future]
                     try:
                         result = future.result()
                         if result:
-                            cards_data.append(result)
+                            results_dict[idx] = result
                     except Exception as e:
                         logger.error(f"画像 {image_path.name} の処理で予期しないエラー: {e}")
                     
                     # プログレスバーを更新
                     bar()
+        
+        # ファイル名順にソートされた結果リストを作成
+        cards_data = [results_dict[idx] for idx in sorted(results_dict.keys())]
         
         # CSVファイルを作成
         if cards_data:

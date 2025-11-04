@@ -8,5 +8,6 @@ dependencies = [
     "alive-progress>=3.3.0",
     "black>=25.9.0",
     "loguru>=0.7.3",
+    "natsort>=8.4.0",
     "openai>=2.6.0",
 ]
