@@ -10,4 +10,5 @@ dependencies = [
     "loguru>=0.7.3",
     "natsort>=8.4.0",
     "openai>=2.6.0",
+    "pandas>=2.2.0",
 ]

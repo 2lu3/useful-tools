@@ -168,7 +168,7 @@ class ImageToAnkiConverter:
         Args:
             cards_data: (問題, 画像ファイル名)のタプルのリスト
         """
-        with open(self.csv_file, 'w', newline='', encoding='utf-8') as csvfile:
+        with open(self.csv_file, 'w', newline='', encoding='utf-8-sig') as csvfile:
             writer = csv.writer(csvfile)
             
             # ヘッダー行はなし

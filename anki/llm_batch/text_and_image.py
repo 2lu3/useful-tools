@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Tuple
 
 from alive_progress import alive_bar
 from loguru import logger
+import pandas as pd
 from openai import OpenAI
 
 
@@ -149,11 +150,9 @@ class TextAndImageBatcher:
         return idx, question_with_image, answer_text
 
     def create_output(self, cards_data: List[Tuple[str, str]]) -> None:
-        with open(self.csv_file, "w", newline="", encoding="utf-8-sig") as csvfile:
-            writer = csv.writer(csvfile)
-            for question, answer in cards_data:
-                writer.writerow([question, answer])
-        logger.info(f"CSV出力: {self.csv_file}")
+        df = pd.DataFrame(cards_data, columns=["問題", "解答"])
+        df.to_csv(self.csv_file, index=False, header=False, encoding="utf-8-sig")
+        logger.info(f"CSV出力: {self.csv_file} (レコード数: {len(df)})")
 
     def run(self) -> None:
         questions = self.load_questions()
