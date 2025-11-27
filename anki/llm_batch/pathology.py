@@ -26,7 +26,8 @@ class TextAndImageBatcher:
         self.image_dir = self.output_dir / "image"
         self.prompt_path = Path("prompt/text_and_image.txt")
         self.csv_file = self.output_dir / "anki_cards.csv"
-        self.max_workers = 5
+        self.response_log_file = self.output_dir / "response.log"
+        self.max_workers = 3
 
         self.output_dir.mkdir(exist_ok=True)
         self.image_dir.mkdir(exist_ok=True)
@@ -36,19 +37,21 @@ class TextAndImageBatcher:
         self.prompt_text = self.prompt_path.read_text(encoding="utf-8").strip()
         self.image_lookup = self.build_image_lookup()
 
-    def load_questions(self) -> List[str]:
+    def load_questions(self) -> List[Tuple[str, str]]:
         csv_files = list(self.input_dir.glob("*.csv"))
         assert len(csv_files) == 1
         csv_path = csv_files[0]
 
-        questions: List[str] = []
+        questions: List[Tuple[str, str]] = []
         with open(csv_path, newline="", encoding="utf-8-sig") as f:
             reader = csv.reader(f)
             for row in reader:
                 assert len(row) >= 1
                 question = row[0].rstrip("\r\n")
                 assert question
-                questions.append(question)
+                # 2列目に解答の選択肢がある場合は取得
+                answer_choices = row[1].rstrip("\r\n") if len(row) >= 2 and row[1] else ""
+                questions.append((question, answer_choices))
 
         logger.info(f"問題数: {len(questions)} ({csv_path.name})")
         return questions
@@ -77,9 +80,14 @@ class TextAndImageBatcher:
         return new_name
 
     def build_prompt_message(
-        self, question_text: str, image_path: Optional[Path]
+        self, question_text: str, answer_choices: str, image_path: Optional[Path]
     ) -> List[dict]:
-        prompt_body = f"{self.prompt_text}\n\n問題:\n{question_text}"
+        # 解答の選択肢がある場合は問題文に追加
+        if answer_choices:
+            question_with_answer = f"{question_text}\n解答: {answer_choices}"
+        else:
+            question_with_answer = question_text
+        prompt_body = f"{self.prompt_text}\n\n問題:\n{question_with_answer}"
         contents = [
             {
                 "type": "text",
@@ -99,51 +107,69 @@ class TextAndImageBatcher:
         return contents
 
     def call_model(
-        self, question_text: str, image_path: Optional[Path]
+        self, question_text: str, answer_choices: str, image_path: Optional[Path], idx: int = 0
     ) -> str:
-        message_content = self.build_prompt_message(question_text, image_path)
+        message_content = self.build_prompt_message(question_text, answer_choices, image_path)
+        
         response = self.client.chat.completions.create(
-            model="gpt-4.1-2025-04-14",
+            model="gpt-5.1-2025-11-13",
             messages=[
                 {
                     "role": "user",
                     "content": message_content,
                 }
             ],
-            max_tokens=1000,
+            max_completion_tokens=2000,
         )
         answer_text = response.choices[0].message.content.strip()
+        
+        # デバッグ: 受信レスポンスをログファイルに保存
+        with open(self.response_log_file, "a", encoding="utf-8") as f:
+            f.write("=" * 80 + "\n")
+            f.write(f"エントリ番号: {idx}\n")
+            f.write("=" * 80 + "\n\n")
+            f.write(answer_text + "\n\n")
+        
         return answer_text
 
     def split_response_sections(self, response_text: str) -> Tuple[str, str]:
         marker = "解答"
-        idx = response_text.find(marker)
-        if idx == -1:
-            return response_text.strip(), ""
-        question_part = response_text[:idx].strip()
-        answer_part = response_text[idx:].lstrip()
-        return question_part, answer_part
+        lines = response_text.splitlines()
+        for i, line in enumerate(lines):
+            if marker in line:
+                question_part = "\n".join(lines[:i]).strip()
+                answer_part = "\n".join(lines[i:]).strip()
+                return question_part, answer_part
+        return response_text.strip(), ""
 
     @staticmethod
     def remove_code_fences(text: str) -> str:
         return text.replace("```", "").strip()
 
+    @staticmethod
+    def newline_to_br(text: str) -> str:
+        """Anki側でのHTMLレンダリングに合わせて改行を<br>へ変換する"""
+        normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+        return normalized.replace("\n", "<br>")
+
     def process_single_entry(
-        self, idx: int, question_text: str, image_path: Optional[Path]
+        self, idx: int, question_text: str, answer_choices: str, image_path: Optional[Path]
     ) -> Tuple[int, str, str]:
         hashed_filename = (
             self.copy_image_with_hash(image_path) if image_path else None
         )
-        response_text = self.call_model(question_text, image_path)
+        response_text = self.call_model(question_text, answer_choices, image_path, idx)
         question_piece, answer_text = self.split_response_sections(response_text)
         if not answer_text:
             answer_text = response_text.strip()
         question_piece = self.remove_code_fences(question_piece)
         answer_text = self.remove_code_fences(answer_text)
         base_question = question_piece or question_text
+        base_question = self.newline_to_br(base_question)
+        answer_text = self.newline_to_br(answer_text)
         if hashed_filename:
             question_with_image = (
-                f"{base_question}\n<img src=\"{hashed_filename}\">"
+                f"{base_question}<br><img src=\"{hashed_filename}\">"
             )
         else:
             question_with_image = base_question
@@ -157,16 +183,16 @@ class TextAndImageBatcher:
     def run(self) -> None:
         questions = self.load_questions()
 
-        targets: List[Tuple[str, Optional[Path]]] = []
-        for idx, question in enumerate(questions, start=1):
-            targets.append((question, self.image_lookup.get(idx)))
+        targets: List[Tuple[str, str, Optional[Path]]] = []
+        for idx, (question, answer_choices) in enumerate(questions, start=1):
+            targets.append((question, answer_choices, self.image_lookup.get(idx)))
 
         results: list[Tuple[int, str, str]] = []
         with alive_bar(len(targets), title="LLM処理中") as bar:
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 future_to_idx = {
-                    executor.submit(self.process_single_entry, idx, question, image): idx
-                    for idx, (question, image) in enumerate(targets)
+                    executor.submit(self.process_single_entry, idx, question, answer_choices, image): idx
+                    for idx, (question, answer_choices, image) in enumerate(targets)
                 }
                 for future in as_completed(future_to_idx):
                     results.append(future.result())
