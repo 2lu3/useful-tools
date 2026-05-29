@@ -1,0 +1,18 @@
+[project]
+name = "toefl3800"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "alive-progress>=3.3.0",
+    "loguru>=0.7.3",
+    "openai>=2.38.0",
+    "pandas>=3.0.3",
+    "pyrate-limiter>=4.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "black>=26.5.1",
+]
