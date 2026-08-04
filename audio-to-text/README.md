@@ -20,14 +20,16 @@ uv sync
 
 ```bash
 uv run python transcribe.py -i input.mp3 -o output.txt
-uv run python transcribe.py -i input.wav -o output.txt -m gpt-transcribe
+uv run python transcribe.py -i input.wav -o output.txt -m gpt-4o-transcribe
 ```
 
 | Flag | Required | Default | Description |
 |------|----------|---------|-------------|
 | `-i` / `--input` | Yes | — | 入力音声ファイル |
 | `-o` / `--output` | Yes | — | 出力テキストファイル |
-| `-m` / `--model` | No | `gpt-4o-mini-transcribe` | OpenAI STT モデル名 |
+| `-m` / `--model` | No | `gpt-transcribe` | OpenAI STT モデル名 |
+
+言語は日本語（`ja`）固定です。CLI での変更はできません。
 
 対応フォーマット例: `mp3`, `mp4`, `mpeg`, `mpga`, `m4a`, `wav`, `webm` など（OpenAI API が受け付ける形式）。
 
@@ -39,8 +41,8 @@ uv run python transcribe.py -i input.wav -o output.txt -m gpt-transcribe
 
 | Model | Approx. price | Accuracy / notes | Best for |
 |-------|---------------|------------------|----------|
-| `gpt-4o-mini-transcribe` | **$0.003 / min** | コスト重視。多くの用途で十分な精度 | デフォルト・大量処理 |
-| `gpt-transcribe` | **$0.0045 / min** | 現行のファイル転写向け推奨系。精度と価格のバランス | 新規ワークフローの第一候補 |
+| `gpt-transcribe` | **$0.0045 / min** | 現行のファイル転写向け推奨系。精度と価格のバランス | デフォルト |
+| `gpt-4o-mini-transcribe` | **$0.003 / min** | コスト重視。多くの用途で十分な精度 | 大量処理 |
 | `gpt-4o-transcribe` | **$0.006 / min** | mini より高精度寄り | 聞き取りづらい音声・品質優先 |
 | `whisper-1` | 約 **$0.006 / min**（レガシー） | タイムスタンプ / SRT・VTT など旧機能向け。新規は非推奨寄り | 字幕・単語タイムスタンプが必要な場合 |
 
@@ -54,8 +56,9 @@ uv run python transcribe.py -i input.wav -o output.txt -m gpt-transcribe
 
 ### 選び方
 
-1. まずは `gpt-4o-mini-transcribe`（デフォルト）
-2. 精度が足りなければ `gpt-transcribe` または `gpt-4o-transcribe`
-3. 単語タイムスタンプや SRT/VTT が必要なら `whisper-1`
+1. まずは `gpt-transcribe`（デフォルト）
+2. コストを抑えたいなら `gpt-4o-mini-transcribe`
+3. さらに精度が欲しければ `gpt-4o-transcribe`
+4. 単語タイムスタンプや SRT/VTT が必要なら `whisper-1`
 
 リアルタイム配信向けの `gpt-live-transcribe` はこのツールの対象外です（ファイル転写のみ）。

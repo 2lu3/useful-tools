@@ -12,7 +12,8 @@ from typing import NoReturn
 
 from openai import OpenAI
 
-DEFAULT_MODEL = "gpt-4o-mini-transcribe"
+DEFAULT_MODEL = "gpt-transcribe"
+DEFAULT_LANGUAGE = "ja"
 OPENAI_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 SAFE_CHUNK_BYTES = 20 * 1024 * 1024
 CHUNK_BITRATE_KBPS = 128
@@ -22,9 +23,9 @@ FFMPEG_TIMEOUT_SEC = 600.0
 FFPROBE_TIMEOUT_SEC = 30.0
 
 KNOWN_MODELS = (
+    "gpt-transcribe",
     "gpt-4o-mini-transcribe",
     "gpt-4o-transcribe",
-    "gpt-transcribe",
     "whisper-1",
 )
 
@@ -192,6 +193,7 @@ def transcribe_file(client: OpenAI, audio_path: Path, model: str) -> str:
             response = client.audio.transcriptions.create(
                 model=model,
                 file=audio_file,
+                language=DEFAULT_LANGUAGE,
             )
         except Exception as error:
             raise RuntimeError(
