@@ -135,34 +135,61 @@ def chunk_encode_args() -> list[str]:
     ]
 
 
-def build_split_command(
-    audio_path: Path, pattern: Path, segment_sec: float
+def build_chunk_command(
+    audio_path: Path,
+    output_path: Path,
+    start_sec: float,
+    duration_sec: float,
 ) -> list[str]:
+    # Input seek (-ss before -i) is fast enough for STT chunk boundaries.
     return [
         "ffmpeg",
         "-y",
+        "-ss",
+        f"{start_sec:.3f}",
         "-i",
         str(audio_path),
-        "-f",
-        "segment",
-        "-segment_time",
-        f"{segment_sec:.3f}",
-        "-reset_timestamps",
-        "1",
+        "-t",
+        f"{duration_sec:.3f}",
         *chunk_encode_args(),
-        str(pattern),
+        str(output_path),
     ]
+
+
+def write_audio_chunk(
+    audio_path: Path,
+    chunk_dir: Path,
+    index: int,
+    start_sec: float,
+    duration_sec: float,
+) -> Path:
+    output_path = chunk_dir / f"chunk_{index:03d}.mp3"
+    run_command(
+        build_chunk_command(audio_path, output_path, start_sec, duration_sec),
+        FFMPEG_TIMEOUT_SEC,
+    )
+    return output_path
 
 
 def split_audio_into_chunks(audio_path: Path, chunk_dir: Path) -> list[Path]:
     duration_sec = get_audio_duration_sec(audio_path)
     chunk_count = max(1, math.ceil(duration_sec / max_chunk_duration_sec()))
     segment_sec = duration_sec / chunk_count
-    pattern = chunk_dir / "chunk_%03d.mp3"
-    run_command(
-        build_split_command(audio_path, pattern, segment_sec), FFMPEG_TIMEOUT_SEC
-    )
-    chunks = sorted(chunk_dir.glob("chunk_*.mp3"))
+    chunks: list[Path] = []
+    for index in range(chunk_count):
+        start_sec = index * segment_sec
+        remaining_sec = duration_sec - start_sec
+        if remaining_sec <= 0:
+            break
+        chunks.append(
+            write_audio_chunk(
+                audio_path,
+                chunk_dir,
+                index,
+                start_sec,
+                min(segment_sec, remaining_sec),
+            )
+        )
     if not chunks:
         raise RuntimeError(f"No chunks were created from {audio_path}")
     return chunks

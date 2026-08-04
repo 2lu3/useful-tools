@@ -33,7 +33,7 @@ uv run python transcribe.py -i input.wav -o output.txt -m gpt-4o-transcribe
 
 対応フォーマット例: `mp3`, `mp4`, `mpeg`, `mpga`, `m4a`, `wav`, `webm` など（OpenAI API が受け付ける形式）。
 
-入力が **25MB 超** の場合は、ffmpeg でモノラル MP3 チャンクに分割して順に転写し、結果を結合します。
+入力が **25MB 超** の場合は、ffmpeg で区間ごとに（`-ss` / `-t`）モノラル MP3 チャンクへ切り出して順に転写し、結果を結合します。
 
 ## Models (performance & pricing guide)
 
